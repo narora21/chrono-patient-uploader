@@ -31,7 +31,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build executable
-        run: pyinstaller --onefile --name chrono-uploader src/uploader.py
+        run: pyinstaller --onefile --name chrono-uploader src/main.py
 
       - name: Package (macOS)
         if: runner.os == 'macOS'

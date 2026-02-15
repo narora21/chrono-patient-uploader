@@ -1,5 +1,5 @@
 APP_NAME := chrono-uploader
-SRC := src/uploader.py
+SRC := src/main.py
 DIST_DIR := dist
 BUILD_DIR := build
 VENV_DIR := .venv

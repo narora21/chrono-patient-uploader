@@ -12,7 +12,7 @@ Batch upload documents to DrChrono from a directory. Filenames encode the patien
 
 ```bash
 pip install -r requirements.txt
-python src/uploader.py /path/to/documents/
+python -m src.main /path/to/documents/
 ```
 
 On first run you'll be prompted for your Client ID and Client Secret, then a browser window opens for DrChrono login. Tokens are saved to `config.json` for future runs.
@@ -21,7 +21,7 @@ On first run you'll be prompted for your Client ID and Client Secret, then a bro
 
 ```bash
 pip install -r requirements.txt
-pyinstaller --onefile src/uploader.py
+make build
 ```
 
 This produces:

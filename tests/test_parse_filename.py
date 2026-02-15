@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.uploader import compile_pattern, parse_filename, parse_date_mmddyy, DEFAULT_PATTERN
+from src.parser import compile_pattern, parse_filename, parse_date_mmddyy, DEFAULT_PATTERN
 
 METATAGS = {
     "L": "laboratory",
