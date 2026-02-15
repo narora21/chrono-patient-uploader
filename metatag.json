@@ -1,0 +1,11 @@
+{
+  "L": "laboratory",
+  "R": "radiology",
+  "HP": "h&p/consults",
+  "C": "cardiology",
+  "P": "pulmonary",
+  "CO": "correspondence",
+  "MI": "miscellaneous",
+  "D": "demographics",
+  "M": "medications/rx"
+}
