@@ -1,6 +1,7 @@
 config.json
 dist/
 build/
+.venv/
 *.spec
 __pycache__/
 *.pyc
