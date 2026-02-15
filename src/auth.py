@@ -14,6 +14,13 @@ from src.config import save_config
 DRCHRONO_BASE = "https://app.drchrono.com"
 REDIRECT_PORT = 8585
 REDIRECT_URI = f"http://localhost:{REDIRECT_PORT}/callback"
+SCOPED_PERMISSIONS = [
+    "patients:summary:read", 
+    "patients:read",
+    "patients:write", 
+    "clinical:read",
+    "clinical:write"
+]
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
@@ -62,7 +69,8 @@ def authorize(config):
     """Run the full OAuth2 browser flow and return updated config with tokens."""
     client_id = urllib.parse.quote(config["client_id"])
     redirect = urllib.parse.quote(REDIRECT_URI)
-    scopes = urllib.parse.quote("patients:summary:read patients:read clinical:read clinical:write")
+    permissions = " ".join(SCOPED_PERMISSIONS)
+    scopes = urllib.parse.quote(permissions)
     url = (
         f"{DRCHRONO_BASE}/o/authorize/"
         f"?redirect_uri={redirect}&response_type=code"
