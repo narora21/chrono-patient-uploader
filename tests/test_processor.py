@@ -116,7 +116,7 @@ class TestCounting:
 
 class TestDryRun:
     @patch("src.processor.upload_document")
-    @patch("src.processor.is_duplicate")
+    @patch("src.processor.is_duplicate", return_value=False)
     @patch("src.processor.find_patient")
     def test_dry_run_skips_upload(self, mock_find, mock_dup, mock_upload, doc_dir, pattern_re, capsys):
         mock_find.return_value = _found_patient()
@@ -124,13 +124,13 @@ class TestDryRun:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re, dry_run=True)
 
         mock_upload.assert_not_called()
-        mock_dup.assert_not_called()
+        mock_dup.assert_called()  # duplicate check still runs
         output = capsys.readouterr().out
         assert "DRY RUN" in output
         assert "Uploaded:   2" in output  # counted as would-upload
 
     @patch("src.processor.upload_document")
-    @patch("src.processor.is_duplicate")
+    @patch("src.processor.is_duplicate", return_value=False)
     @patch("src.processor.find_patient")
     def test_dry_run_no_file_moves(self, mock_find, mock_dup, mock_upload, doc_dir, pattern_re, tmp_path):
         mock_find.return_value = _found_patient()
@@ -141,6 +141,20 @@ class TestDryRun:
         # Files should still be in original directory
         assert (doc_dir / "DOE,JANE_R_020326_CXR.pdf").exists()
         assert (doc_dir / "SMITH,JOHN_L_120124_CBC.pdf").exists()
+
+    @patch("src.processor.upload_document")
+    @patch("src.processor.is_duplicate", return_value=True)
+    @patch("src.processor.find_patient")
+    def test_dry_run_reports_duplicates(self, mock_find, mock_dup, mock_upload, doc_dir, pattern_re, capsys):
+        mock_find.return_value = _found_patient()
+
+        process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re, dry_run=True)
+
+        mock_upload.assert_not_called()
+        output = capsys.readouterr().out
+        assert "DRY RUN" in output
+        assert "Duplicates: 2" in output
+        assert "Uploaded:   0" in output
 
 
 # -----------------------------------------------------------------------

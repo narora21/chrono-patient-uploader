@@ -100,28 +100,27 @@ def _process_single_file(
             category="failed",
         )
 
-    if not dry_run:
-        try:
-            dup = is_duplicate(config, lookup.patient_id, parsed.date, parsed.description, parsed.tag_full)
-        except requests.RequestException as exc:
-            detail = f"duplicate check failed: {exc}"
-            print(f"  {tag}   FAIL  {detail}")
-            return _FileResult(
+    try:
+        dup = is_duplicate(config, lookup.patient_id, parsed.date, parsed.description, parsed.tag_full)
+    except requests.RequestException as exc:
+        detail = f"duplicate check failed: {exc}"
+        print(f"  {tag}   FAIL  {detail}")
+        return _FileResult(
+            filename=filename,
+            error=FileError(filename=filename, reason=FileErrorReason.UPLOAD_FAILED, detail=detail),
+            category="failed",
+        )
+    if dup:
+        print(f"  {tag}   DUP   duplicate document already exists")
+        return _FileResult(
+            filename=filename,
+            error=FileError(
                 filename=filename,
-                error=FileError(filename=filename, reason=FileErrorReason.UPLOAD_FAILED, detail=detail),
-                category="failed",
-            )
-        if dup:
-            print(f"  {tag}   DUP   duplicate document already exists")
-            return _FileResult(
-                filename=filename,
-                error=FileError(
-                    filename=filename,
-                    reason=FileErrorReason.DUPLICATE,
-                    detail=f"patient {lookup.patient_id}, date {parsed.date}, description '{parsed.description}'",
-                ),
-                category="duplicate",
-            )
+                reason=FileErrorReason.DUPLICATE,
+                detail=f"patient {lookup.patient_id}, date {parsed.date}, description '{parsed.description}'",
+            ),
+            category="duplicate",
+        )
 
     if dry_run:
         print(f"  {tag}   DRY   would upload to patient {lookup.patient_id}")
