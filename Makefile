@@ -11,7 +11,7 @@ UNAME := $(shell uname -s)
 VENV_PIP := $(VENV_DIR)/bin/pip
 VENV_PYINSTALLER := $(VENV_DIR)/bin/pyinstaller
 
-.PHONY: build dist clean install
+.PHONY: build dist clean install test
 
 $(VENV_DIR):
 	$(PYTHON) -m venv $(VENV_DIR)
@@ -40,6 +40,9 @@ else
 	rm -rf $(DIST_DIR)/$(APP_NAME)-win
 	@echo "\nBuilt: $(DIST_DIR)/$(APP_NAME)-win.zip"
 endif
+
+test: install
+	$(VENV_DIR)/bin/pytest tests/ -v
 
 clean:
 	rm -rf $(DIST_DIR) $(BUILD_DIR) $(VENV_DIR) *.spec __pycache__ src/__pycache__
