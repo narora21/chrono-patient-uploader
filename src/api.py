@@ -1,6 +1,7 @@
 """DrChrono API operations: patient lookup, duplicate detection, document upload."""
 
 import json
+import threading
 from pathlib import Path
 
 import requests
@@ -18,6 +19,7 @@ from src.types import (
 # ---------------------------------------------------------------------------
 
 _patient_cache: dict[str, PatientLookupResult] = {}
+_patient_cache_lock = threading.Lock()
 
 
 def find_patient(config, last_name, first_name, middle_initial=None) -> PatientLookupResult:
@@ -25,10 +27,12 @@ def find_patient(config, last_name, first_name, middle_initial=None) -> PatientL
 
     If zero or multiple matches are found, returns an error.
     Results are cached so the same patient isn't looked up twice in one run.
+    Thread-safe.
     """
     cache_key = f"{last_name.lower()}|{first_name.lower()}|{(middle_initial or '').lower()}"
-    if cache_key in _patient_cache:
-        return _patient_cache[cache_key]
+    with _patient_cache_lock:
+        if cache_key in _patient_cache:
+            return _patient_cache[cache_key]
 
     resp = requests.get(
         f"{DRCHRONO_BASE}/api/patients",
@@ -49,10 +53,7 @@ def find_patient(config, last_name, first_name, middle_initial=None) -> PatientL
 
     if len(results) == 0:
         result = PatientLookupResult(status=PatientLookupStatus.NOT_FOUND)
-        _patient_cache[cache_key] = result
-        return result
-
-    if len(results) > 1:
+    elif len(results) > 1:
         names = "; ".join(
             f"{p.get('first_name', '')} {p.get('middle_name', '') or ''} {p.get('last_name', '')}".strip()
             + f" (DOB: {p.get('date_of_birth', 'N/A')}, ID: {p['id']})"
@@ -62,16 +63,16 @@ def find_patient(config, last_name, first_name, middle_initial=None) -> PatientL
             status=PatientLookupStatus.MULTIPLE_MATCHES,
             detail=names,
         )
-        _patient_cache[cache_key] = result
-        return result
+    else:
+        patient = results[0]
+        result = PatientLookupResult(
+            status=PatientLookupStatus.FOUND,
+            patient_id=patient["id"],
+            doctor_id=patient.get("doctor"),
+        )
 
-    patient = results[0]
-    result = PatientLookupResult(
-        status=PatientLookupStatus.FOUND,
-        patient_id=patient["id"],
-        doctor_id=patient.get("doctor"),
-    )
-    _patient_cache[cache_key] = result
+    with _patient_cache_lock:
+        _patient_cache.setdefault(cache_key, result)
     return result
 
 
@@ -80,12 +81,14 @@ def find_patient(config, last_name, first_name, middle_initial=None) -> PatientL
 # ---------------------------------------------------------------------------
 
 _documents_cache: dict[int, list[dict]] = {}
+_documents_cache_lock = threading.Lock()
 
 
 def get_patient_documents(config, patient_id: int) -> list[dict]:
-    """Fetch all existing documents for a patient (cached per run)."""
-    if patient_id in _documents_cache:
-        return _documents_cache[patient_id]
+    """Fetch all existing documents for a patient (cached per run). Thread-safe."""
+    with _documents_cache_lock:
+        if patient_id in _documents_cache:
+            return _documents_cache[patient_id]
 
     documents: list[dict] = []
     url: str | None = f"{DRCHRONO_BASE}/api/documents"
@@ -99,7 +102,8 @@ def get_patient_documents(config, patient_id: int) -> list[dict]:
         url = data.get("next")
         params = {}
 
-    _documents_cache[patient_id] = documents
+    with _documents_cache_lock:
+        _documents_cache.setdefault(patient_id, documents)
     return documents
 
 

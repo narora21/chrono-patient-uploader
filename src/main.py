@@ -27,6 +27,13 @@ def main():
         default=DEFAULT_PATTERN,
         help="Filename pattern using placeholders (default: %(default)s)",
     )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of parallel upload workers (default: 1)",
+    )
     args = parser.parse_args()
 
     print("=== DrChrono Batch Document Uploader ===\n")
@@ -44,7 +51,10 @@ def main():
 
     print(f"Using filename pattern: {args.pattern}\n")
 
-    process_directory(config, args.directory, metatags, pattern_re, dry_run=args.dry_run, dest_dir=args.dest)
+    process_directory(
+        config, args.directory, metatags, pattern_re,
+        dry_run=args.dry_run, dest_dir=args.dest, num_workers=args.num_workers,
+    )
 
 
 if __name__ == "__main__":
