@@ -9,14 +9,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
+import requests
+
 from src.api import find_patient, is_duplicate, upload_document
 from src.parser import parse_filename
 from src.types import (
     FileError,
     FileErrorReason,
-    ParsedFilename,
     PatientLookupStatus,
-    UploadResult,
     UploadStatus,
 )
 
@@ -71,12 +71,21 @@ def _process_single_file(
     print(f"  {tag}   Date: {parsed.date}")
     print(f"  {tag}   Description: {parsed.description}")
 
-    lookup = find_patient(
-        config,
-        parsed.last_name,
-        parsed.first_name,
-        parsed.middle_initial,
-    )
+    try:
+        lookup = find_patient(
+            config,
+            parsed.last_name,
+            parsed.first_name,
+            parsed.middle_initial,
+        )
+    except requests.RequestException as exc:
+        detail = f"patient lookup failed: {exc}"
+        print(f"  {tag}   FAIL  {detail}")
+        return _FileResult(
+            filename=filename,
+            error=FileError(filename=filename, reason=FileErrorReason.UPLOAD_FAILED, detail=detail),
+            category="failed",
+        )
 
     if lookup.status != PatientLookupStatus.FOUND:
         if lookup.status == PatientLookupStatus.NOT_FOUND:
@@ -91,17 +100,28 @@ def _process_single_file(
             category="failed",
         )
 
-    if not dry_run and is_duplicate(config, lookup.patient_id, parsed.date, parsed.description, parsed.tag_full):
-        print(f"  {tag}   DUP   duplicate document already exists")
-        return _FileResult(
-            filename=filename,
-            error=FileError(
+    if not dry_run:
+        try:
+            dup = is_duplicate(config, lookup.patient_id, parsed.date, parsed.description, parsed.tag_full)
+        except requests.RequestException as exc:
+            detail = f"duplicate check failed: {exc}"
+            print(f"  {tag}   FAIL  {detail}")
+            return _FileResult(
                 filename=filename,
-                reason=FileErrorReason.DUPLICATE,
-                detail=f"patient {lookup.patient_id}, date {parsed.date}, description '{parsed.description}'",
-            ),
-            category="duplicate",
-        )
+                error=FileError(filename=filename, reason=FileErrorReason.UPLOAD_FAILED, detail=detail),
+                category="failed",
+            )
+        if dup:
+            print(f"  {tag}   DUP   duplicate document already exists")
+            return _FileResult(
+                filename=filename,
+                error=FileError(
+                    filename=filename,
+                    reason=FileErrorReason.DUPLICATE,
+                    detail=f"patient {lookup.patient_id}, date {parsed.date}, description '{parsed.description}'",
+                ),
+                category="duplicate",
+            )
 
     if dry_run:
         print(f"  {tag}   DRY   would upload to patient {lookup.patient_id}")
