@@ -11,7 +11,7 @@ UNAME := $(shell uname -s)
 VENV_PIP := $(VENV_DIR)/bin/pip
 VENV_PYINSTALLER := $(VENV_DIR)/bin/pyinstaller
 
-.PHONY: dist clean install
+.PHONY: build dist clean install
 
 $(VENV_DIR):
 	$(PYTHON) -m venv $(VENV_DIR)
@@ -19,8 +19,11 @@ $(VENV_DIR):
 install: $(VENV_DIR)
 	$(VENV_PIP) install -r requirements.txt
 
-dist: install
+build: install
 	$(VENV_PYINSTALLER) --onefile --name $(APP_NAME) $(SRC)
+	@echo "\nBuilt: $(DIST_DIR)/$(APP_NAME)"
+
+dist: build
 ifeq ($(UNAME),Darwin)
 	mkdir -p $(DIST_DIR)/$(APP_NAME)-mac
 	cp $(BUNDLE_FILES) $(DIST_DIR)/$(APP_NAME)-mac/
