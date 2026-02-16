@@ -13,7 +13,7 @@ import requests
 from src.version import __version__
 
 REPO = "narora21/chrono-patient-uploader"
-LATEST_URL = f"https://api.github.com/repos/{REPO}/releases/latest"
+RELEASES_URL = f"https://api.github.com/repos/{REPO}/releases"
 
 # ANSI escape codes
 _BOLD = "\033[1m"
@@ -63,15 +63,38 @@ def cleanup_old_binary():
         pass
 
 
+def _fetch_latest_release():
+    """Fetch all releases and return the one with the highest semver tag."""
+    resp = requests.get(RELEASES_URL, timeout=10)
+    resp.raise_for_status()
+    releases = resp.json()
+
+    best = None
+    best_version = (-1,)
+    for rel in releases:
+        if rel.get("draft") or rel.get("prerelease"):
+            continue
+        tag = rel.get("tag_name", "")
+        try:
+            ver = _parse_version(tag)
+        except (ValueError, IndexError):
+            continue
+        if ver > best_version:
+            best_version = ver
+            best = rel
+
+    return best
+
+
 def check_for_update():
     """Print a notice if a newer version is available. Non-blocking — silently does nothing on error."""
     try:
-        resp = requests.get(LATEST_URL, timeout=5)
-        resp.raise_for_status()
-        latest_tag = resp.json()["tag_name"]
-        if _parse_version(latest_tag) > _parse_version(__version__):
-            print(f"{_BOLD}{_YELLOW}A new version is available: {latest_tag} (current: {__version__}){_RESET}")
-            print(f"{_BOLD}{_YELLOW}Run: chrono-uploader update{_RESET}\n")
+        release = _fetch_latest_release()
+        if release:
+            latest_tag = release["tag_name"]
+            if _parse_version(latest_tag) > _parse_version(__version__):
+                print(f"{_BOLD}{_YELLOW}A new version is available: {latest_tag} (current: {__version__}){_RESET}")
+                print(f"{_BOLD}{_YELLOW}Run: chrono-uploader update{_RESET}\n")
     except Exception:
         pass
 
@@ -85,18 +108,24 @@ def self_update(target_version=None):
         tag = target_version if target_version.startswith("v") else f"v{target_version}"
         release_url = f"https://api.github.com/repos/{REPO}/releases/tags/{tag}"
         print(f"Fetching version {tag}...")
+        try:
+            resp = requests.get(release_url, timeout=10)
+            resp.raise_for_status()
+        except requests.RequestException as exc:
+            print(f"Error: Could not fetch release: {exc}")
+            sys.exit(1)
+        release = resp.json()
     else:
-        release_url = LATEST_URL
         print("Checking for updates...")
+        try:
+            release = _fetch_latest_release()
+        except requests.RequestException as exc:
+            print(f"Error: Could not fetch releases: {exc}")
+            sys.exit(1)
+        if not release:
+            print("No releases found.")
+            return
 
-    try:
-        resp = requests.get(release_url, timeout=10)
-        resp.raise_for_status()
-    except requests.RequestException as exc:
-        print(f"Error: Could not fetch release: {exc}")
-        sys.exit(1)
-
-    release = resp.json()
     release_tag = release["tag_name"]
 
     if not target_version:
