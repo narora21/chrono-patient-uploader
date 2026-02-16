@@ -137,32 +137,63 @@ def self_update():
             print("Error: Could not find executable in downloaded archive.")
             sys.exit(1)
 
-        # Replace the current binary
-        print(f"Updating {binary_path}...")
-        if system == "Windows":
-            # Windows can't overwrite a running exe; rename old first
-            old_path = binary_path + ".old"
-            os.replace(binary_path, old_path)
-            shutil.copy2(new_binary, binary_path)
-            os.remove(old_path)
-        else:
-            shutil.copy2(new_binary, binary_path)
-            os.chmod(binary_path, os.stat(binary_path).st_mode | stat.S_IEXEC)
-
-        # Also update bundled files (metatag.json, README.md)
+        # Copy bundled files (these aren't locked, safe to overwrite)
         for fname in ("metatag.json", "README.md"):
             for root, dirs, files in os.walk(extract_dir):
                 if fname in files:
                     shutil.copy2(os.path.join(root, fname), os.path.join(install_dir, fname))
                     break
 
-        # Verify
-        print("Verifying update...")
-        result = subprocess.run([binary_path, "--version"], capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f"Updated successfully to {result.stdout.strip()}.")
+        # Replace the current binary
+        print(f"Updating {binary_path}...")
+        if system == "Windows":
+            _windows_swap(binary_path, new_binary, tmpdir)
         else:
-            print("Warning: Update installed but verification failed.")
+            shutil.copy2(new_binary, binary_path)
+            os.chmod(binary_path, os.stat(binary_path).st_mode | stat.S_IEXEC)
+            print("Verifying update...")
+            result = subprocess.run([binary_path, "--version"], capture_output=True, text=True)
+            if result.returncode == 0:
+                print(f"Updated successfully to {result.stdout.strip()}.")
+            else:
+                print("Warning: Update installed but verification failed.")
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
-    finally:
+    except Exception:
         shutil.rmtree(tmpdir, ignore_errors=True)
+        raise
+
+
+def _windows_swap(binary_path: str, new_binary: str, tmpdir: str):
+    """On Windows, spawn a batch script to swap the exe after this process exits."""
+    # Copy new binary to a staging location next to the current one
+    staged_path = binary_path + ".new"
+    shutil.copy2(new_binary, staged_path)
+
+    # Write a batch script that waits for us to exit, then swaps
+    bat_path = os.path.join(os.path.dirname(binary_path), "_update.cmd")
+    with open(bat_path, "w") as f:
+        f.write("@echo off\r\n")
+        # Wait for the current process to exit (retry loop)
+        f.write("echo Waiting for chrono-uploader to exit...\r\n")
+        f.write(":wait\r\n")
+        f.write("timeout /t 1 /nobreak >nul\r\n")
+        f.write(f'del "{binary_path}" >nul 2>&1\r\n')
+        f.write("if exist \"{0}\" goto wait\r\n".format(binary_path))
+        # Move new binary into place
+        f.write(f'move "{staged_path}" "{binary_path}"\r\n')
+        # Verify
+        f.write(f'"{binary_path}" --version\r\n')
+        f.write("echo Update complete.\r\n")
+        # Clean up temp dir and this script
+        f.write(f'rmdir /s /q "{tmpdir}" >nul 2>&1\r\n')
+        f.write(f'del "%~f0"\r\n')
+
+    # Launch the batch script detached and exit
+    subprocess.Popen(
+        ["cmd", "/c", bat_path],
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+        close_fds=True,
+    )
+    print("Update staged. The swap will complete momentarily.")
+    sys.exit(0)
