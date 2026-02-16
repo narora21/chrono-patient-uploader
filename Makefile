@@ -32,6 +32,13 @@ ifeq ($(UNAME),Darwin)
 	tar -czf $(DIST_DIR)/$(APP_NAME)-mac.tar.gz -C $(DIST_DIR) $(APP_NAME)-mac
 	rm -rf $(DIST_DIR)/$(APP_NAME)-mac
 	@echo "\nBuilt: $(DIST_DIR)/$(APP_NAME)-mac.tar.gz"
+else ifeq ($(UNAME),Linux)
+	mkdir -p $(DIST_DIR)/$(APP_NAME)-linux
+	cp $(BUNDLE_FILES) $(DIST_DIR)/$(APP_NAME)-linux/
+	mv $(DIST_DIR)/$(APP_NAME) $(DIST_DIR)/$(APP_NAME)-linux/
+	tar -czf $(DIST_DIR)/$(APP_NAME)-linux.tar.gz -C $(DIST_DIR) $(APP_NAME)-linux
+	rm -rf $(DIST_DIR)/$(APP_NAME)-linux
+	@echo "\nBuilt: $(DIST_DIR)/$(APP_NAME)-linux.tar.gz"
 else
 	mkdir -p $(DIST_DIR)/$(APP_NAME)-win
 	cp $(BUNDLE_FILES) $(DIST_DIR)/$(APP_NAME)-win/

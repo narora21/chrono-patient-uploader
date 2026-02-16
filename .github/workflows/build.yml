@@ -14,6 +14,9 @@ jobs:
           - os: macos-latest
             artifact: chrono-uploader-mac
             ext: tar.gz
+          - os: ubuntu-latest
+            artifact: chrono-uploader-linux
+            ext: tar.gz
           - os: windows-latest
             artifact: chrono-uploader-win
             ext: zip
@@ -40,6 +43,14 @@ jobs:
           cp metatag.json README.md dist/chrono-uploader-mac/
           mv dist/chrono-uploader dist/chrono-uploader-mac/
           tar -czf dist/chrono-uploader-mac.tar.gz -C dist chrono-uploader-mac
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist/chrono-uploader-linux
+          cp metatag.json README.md dist/chrono-uploader-linux/
+          mv dist/chrono-uploader dist/chrono-uploader-linux/
+          tar -czf dist/chrono-uploader-linux.tar.gz -C dist chrono-uploader-linux
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -74,4 +85,5 @@ jobs:
         with:
           files: |
             artifacts/chrono-uploader-mac/*.tar.gz
+            artifacts/chrono-uploader-linux/*.tar.gz
             artifacts/chrono-uploader-win/*.zip
