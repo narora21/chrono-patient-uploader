@@ -83,6 +83,28 @@ class TestFindPatient:
         assert result.status == PatientLookupStatus.MULTIPLE_MATCHES
 
     @patch("src.api.requests.get")
+    def test_exact_name_narrows_multiple(self, mock_get):
+        """SMITH search returns SMITH and SMITHSON — exact match picks SMITH."""
+        mock_get.return_value = _mock_response({"results": [
+            {"id": 1, "first_name": "JOHN", "last_name": "SMITH", "doctor": 5},
+            {"id": 2, "first_name": "JOHN", "last_name": "SMITHSON", "doctor": 6},
+        ]})
+        result = find_patient(FAKE_CONFIG, "SMITH", "JOHN")
+        assert result.status == PatientLookupStatus.FOUND
+        assert result.patient_id == 1
+
+    @patch("src.api.requests.get")
+    def test_exact_first_name_narrows_multiple(self, mock_get):
+        """JO search returns JO and JOHN — exact match picks JO."""
+        mock_get.return_value = _mock_response({"results": [
+            {"id": 1, "first_name": "JO", "last_name": "DOE", "doctor": 5},
+            {"id": 2, "first_name": "JOHN", "last_name": "DOE", "doctor": 6},
+        ]})
+        result = find_patient(FAKE_CONFIG, "DOE", "JO")
+        assert result.status == PatientLookupStatus.FOUND
+        assert result.patient_id == 1
+
+    @patch("src.api.requests.get")
     def test_middle_initial_still_multiple(self, mock_get):
         """Middle initial filters but still leaves multiple matches."""
         mock_get.return_value = _mock_response({"results": [

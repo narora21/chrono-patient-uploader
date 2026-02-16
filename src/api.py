@@ -51,6 +51,16 @@ def find_patient(config, last_name, first_name, middle_initial=None) -> PatientL
         if filtered:
             results = filtered
 
+    # Try exact name match to narrow down results
+    if len(results) > 1:
+        exact = [
+            p for p in results
+            if p.get("last_name", "").upper() == last_name.upper()
+            and p.get("first_name", "").upper() == first_name.upper()
+        ]
+        if len(exact) >= 1:
+            results = exact
+
     if len(results) == 0:
         result = PatientLookupResult(status=PatientLookupStatus.NOT_FOUND)
     elif len(results) > 1:
