@@ -59,7 +59,8 @@ On first run you'll be prompted for your Client ID and Client Secret, then a bro
 ## Usage
 
 ```bash
-chrono-uploader /path/to/documents/
+chrono-uploader upload --help
+chrono-uploader upload /path/to/documents/ --dest /path/to/archive/
 ```
 
 ### Options
