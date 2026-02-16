@@ -89,6 +89,9 @@ def main():
     # --- gui subcommand ---
     subparsers.add_parser("gui", help="Launch graphical interface")
 
+    # --- install gui shortcut subcommand ---
+    subparsers.add_parser("install-shortcut", help="Install desktop shortcut for graphical interface")
+
     # If no subcommand given but args look like a path, treat as upload
     args = parser.parse_args()
 
@@ -111,6 +114,9 @@ def main():
     elif args.command == "gui":
         from src.gui import launch
         launch()
+    elif args.command == "install-shortcut":
+        from src.gui import install_shortcut
+        install_shortcut()
 
 
 if __name__ == "__main__":

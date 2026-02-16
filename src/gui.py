@@ -2,6 +2,7 @@
 
 import io
 import os
+import platform
 import queue
 import sys
 import threading
@@ -399,6 +400,83 @@ class App:
             sys.stdout = old_stdout
             self._running = False
             self.root.after(0, lambda: self.upload_btn.configure(state=tk.NORMAL))
+
+
+def install_shortcut():
+    """Create a desktop shortcut to launch the GUI."""
+    if not getattr(sys, "frozen", False):
+        print("Error: install-shortcut only works with the standalone executable.")
+        print("You're running from source — launch with: python -m src.main gui")
+        sys.exit(1)
+
+    binary = sys.executable
+    system = platform.system()
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
+    if system == "Darwin":
+        app_path = os.path.join(desktop, "DrChrono Uploader.app")
+        if os.path.exists(app_path):
+            print(f"Shortcut already exists: {app_path}")
+            return
+        macos_dir = os.path.join(app_path, "Contents", "MacOS")
+        os.makedirs(macos_dir, exist_ok=True)
+
+        script_path = os.path.join(macos_dir, "launcher")
+        with open(script_path, "w") as f:
+            f.write("#!/bin/bash\n")
+            f.write(f'exec "{binary}" gui\n')
+        os.chmod(script_path, 0o755)
+
+        plist_path = os.path.join(app_path, "Contents", "Info.plist")
+        with open(plist_path, "w") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write('<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+                    '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n')
+            f.write('<plist version="1.0">\n<dict>\n')
+            f.write('  <key>CFBundleName</key>\n  <string>DrChrono Uploader</string>\n')
+            f.write('  <key>CFBundleExecutable</key>\n  <string>launcher</string>\n')
+            f.write('  <key>CFBundleIdentifier</key>\n  <string>com.chrono-uploader.gui</string>\n')
+            f.write('  <key>CFBundlePackageType</key>\n  <string>APPL</string>\n')
+            f.write('  <key>LSUIElement</key>\n  <false/>\n')
+            f.write('</dict>\n</plist>\n')
+        print(f"Desktop shortcut created: {app_path}")
+
+    elif system == "Windows":
+        lnk_path = os.path.join(desktop, "DrChrono Uploader.lnk")
+        if os.path.exists(lnk_path):
+            print(f"Shortcut already exists: {lnk_path}")
+            return
+        ps_cmd = (
+            f'$ws = New-Object -ComObject WScript.Shell; '
+            f'$s = $ws.CreateShortcut("{lnk_path}"); '
+            f'$s.TargetPath = "{binary}"; '
+            f'$s.Arguments = "gui"; '
+            f'$s.WorkingDirectory = "{os.path.dirname(binary)}"; '
+            f'$s.Description = "DrChrono Batch Document Uploader"; '
+            f'$s.Save()'
+        )
+        import subprocess
+        subprocess.run(["powershell", "-Command", ps_cmd], capture_output=True)
+        print(f"Desktop shortcut created: {lnk_path}")
+
+    elif system == "Linux":
+        desktop_file = os.path.join(desktop, "chrono-uploader.desktop")
+        if os.path.exists(desktop_file):
+            print(f"Shortcut already exists: {desktop_file}")
+            return
+        with open(desktop_file, "w") as f:
+            f.write("[Desktop Entry]\n")
+            f.write("Type=Application\n")
+            f.write("Name=DrChrono Uploader\n")
+            f.write(f"Exec={binary} gui\n")
+            f.write("Terminal=false\n")
+            f.write("Comment=DrChrono Batch Document Uploader\n")
+        os.chmod(desktop_file, 0o755)
+        print(f"Desktop shortcut created: {desktop_file}")
+
+    else:
+        print(f"Error: Unsupported platform '{system}'.")
+        sys.exit(1)
 
 
 def launch():
