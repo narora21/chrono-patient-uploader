@@ -32,6 +32,11 @@ def load_metatags():
         return json.load(f)
 
 
+def save_metatags(metatags):
+    with open(METATAG_FILE, "w") as f:
+        json.dump(metatags, f, indent=2)
+
+
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, "r") as f:
