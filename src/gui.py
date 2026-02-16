@@ -1,7 +1,9 @@
 """Tkinter GUI for the DrChrono Batch Document Uploader."""
 
 import io
+import os
 import queue
+import subprocess
 import sys
 import threading
 import tkinter as tk
@@ -11,6 +13,7 @@ from src.auth import ensure_auth
 from src.config import ensure_credentials, load_config, load_metatags, save_config
 from src.parser import DEFAULT_PATTERN, compile_pattern
 from src.processor import process_directory
+from src.updater import _fetch_latest_release, _parse_version, self_update
 from src.version import __version__
 
 
@@ -67,6 +70,10 @@ class App:
         self._build_ui()
         self._output_queue: queue.Queue = queue.Queue()
         self._running = False
+        self._latest_tag: str | None = None
+
+        # Check for updates in background on startup
+        threading.Thread(target=self._check_for_update, daemon=True).start()
 
     def _build_ui(self):
         # --- Controls frame ---
@@ -98,9 +105,15 @@ class App:
         self.workers_spin.pack(side=tk.LEFT, padx=4)
         ttk.Label(opts, text="(recommended: no more than 8)", foreground="gray").pack(side=tk.LEFT)
 
-        # Upload button
-        self.upload_btn = ttk.Button(controls, text="Upload", command=self._start_upload)
-        self.upload_btn.grid(row=3, column=0, columnspan=3, pady=(12, 0))
+        # Buttons row
+        btn_row = ttk.Frame(controls)
+        btn_row.grid(row=3, column=0, columnspan=3, pady=(12, 0))
+
+        self.upload_btn = ttk.Button(btn_row, text="Upload", command=self._start_upload)
+        self.upload_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        self.update_btn = ttk.Button(btn_row, text="Update Available", command=self._start_update, state=tk.DISABLED)
+        self.update_btn.pack(side=tk.LEFT)
 
         controls.columnconfigure(1, weight=1)
 
@@ -137,6 +150,63 @@ class App:
                 break
         if self._running:
             self.root.after(100, self._poll_queue)
+
+    def _check_for_update(self):
+        """Check for updates in background. Enable button if newer version exists."""
+        try:
+            release = _fetch_latest_release()
+            if release:
+                tag = release["tag_name"]
+                if _parse_version(tag) > _parse_version(__version__):
+                    self._latest_tag = tag
+                    self.root.after(0, lambda: self.update_btn.configure(
+                        text=f"Update to {tag}", state=tk.NORMAL,
+                    ))
+        except Exception:
+            pass
+
+    def _start_update(self):
+        """Run self-update in a background thread, then relaunch."""
+        self._running = True
+        self.upload_btn.configure(state=tk.DISABLED)
+        self.update_btn.configure(state=tk.DISABLED)
+        self.log.configure(state=tk.NORMAL)
+        self.log.delete("1.0", tk.END)
+        self.log.configure(state=tk.DISABLED)
+        self.root.after(100, self._poll_queue)
+
+        threading.Thread(target=self._run_update, daemon=True).start()
+
+    def _run_update(self):
+        old_stdout = sys.stdout
+        sys.stdout = _QueueWriter(self._output_queue)
+        try:
+            self_update(target_version=self._latest_tag)
+            print("\nRestarting...")
+        except SystemExit:
+            pass
+        except Exception as exc:
+            print(f"\nUpdate failed: {exc}")
+            sys.stdout = old_stdout
+            self._running = False
+            self.root.after(0, lambda: self.upload_btn.configure(state=tk.NORMAL))
+            return
+        finally:
+            sys.stdout = old_stdout
+            self._running = False
+
+        # Relaunch the application
+        binary = sys.executable if getattr(sys, "frozen", False) else None
+        if binary:
+            self.root.after(0, lambda: self._relaunch(binary))
+        else:
+            self.root.after(0, lambda: self.upload_btn.configure(state=tk.NORMAL))
+
+    def _relaunch(self, binary: str):
+        """Close the GUI and relaunch the binary."""
+        self.root.destroy()
+        subprocess.Popen([binary, "gui"])
+        sys.exit(0)
 
     def _start_upload(self):
         source = self.source_var.get().strip()
