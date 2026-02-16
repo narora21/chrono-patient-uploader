@@ -83,6 +83,16 @@ class TestFindPatient:
         assert result.status == PatientLookupStatus.MULTIPLE_MATCHES
 
     @patch("src.api.requests.get")
+    def test_middle_initial_still_multiple(self, mock_get):
+        """Middle initial filters but still leaves multiple matches."""
+        mock_get.return_value = _mock_response({"results": [
+            {"id": 1, "first_name": "JANE", "middle_name": "Marie", "last_name": "DOE", "date_of_birth": "1990-01-01"},
+            {"id": 2, "first_name": "JANE", "middle_name": "May", "last_name": "DOE", "date_of_birth": "1985-05-05"},
+        ]})
+        result = find_patient(FAKE_CONFIG, "DOE", "JANE", middle_initial="M")
+        assert result.status == PatientLookupStatus.MULTIPLE_MATCHES
+
+    @patch("src.api.requests.get")
     def test_cache_returns_same_result(self, mock_get):
         mock_get.return_value = _mock_response({"results": [
             {"id": 42, "doctor": 7, "first_name": "JANE", "last_name": "DOE"},
