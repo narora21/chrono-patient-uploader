@@ -26,6 +26,26 @@ irm https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scri
 
 Installs to `%LOCALAPPDATA%\chrono-uploader\`.
 
+<details>
+<summary>Install a specific version</summary>
+
+**Mac / Linux:**
+```sh
+curl -fsSL https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scripts/install.sh | sh -s -- v0.0.2
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scripts/install.ps1 -OutFile install.ps1; .\install.ps1 -Version v0.0.2
+```
+
+You can also downgrade or pin a version with the update command:
+```bash
+chrono-uploader update v0.0.2
+```
+
+</details>
+
 ## Prerequisites
 
 1. **Register a DrChrono API application** at https://app.drchrono.com/api-management/

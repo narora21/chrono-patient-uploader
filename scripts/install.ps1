@@ -1,11 +1,19 @@
+param(
+    [string]$Version = "latest"
+)
+
 $ErrorActionPreference = "Stop"
 
 $Repo = "narora21/chrono-patient-uploader"
 $InstallDir = "$env:LOCALAPPDATA\chrono-uploader"
 $Archive = "chrono-uploader-win.zip"
-$Url = "https://github.com/$Repo/releases/latest/download/$Archive"
+if ($Version -eq "latest") {
+    $Url = "https://github.com/$Repo/releases/latest/download/$Archive"
+} else {
+    $Url = "https://github.com/$Repo/releases/download/$Version/$Archive"
+}
 
-Write-Host "Downloading chrono-uploader for Windows..."
+Write-Host "Downloading chrono-uploader $Version for Windows..."
 $TmpDir = New-Item -ItemType Directory -Path ([System.IO.Path]::GetTempPath() + [System.Guid]::NewGuid().ToString())
 $ZipPath = Join-Path $TmpDir $Archive
 Invoke-WebRequest -Uri $Url -OutFile $ZipPath

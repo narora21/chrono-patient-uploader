@@ -3,6 +3,7 @@ set -e
 
 REPO="narora21/chrono-patient-uploader"
 INSTALL_DIR="$HOME/chrono-uploader"
+VERSION="${1:-latest}"
 
 OS=$(uname -s)
 case "$OS" in
@@ -15,9 +16,13 @@ case "$OS" in
 esac
 
 ARCHIVE="chrono-uploader-${PLATFORM}.tar.gz"
-URL="https://github.com/${REPO}/releases/latest/download/${ARCHIVE}"
+if [ "$VERSION" = "latest" ]; then
+  URL="https://github.com/${REPO}/releases/latest/download/${ARCHIVE}"
+else
+  URL="https://github.com/${REPO}/releases/download/${VERSION}/${ARCHIVE}"
+fi
 
-echo "Downloading chrono-uploader for ${PLATFORM}..."
+echo "Downloading chrono-uploader ${VERSION} for ${PLATFORM}..."
 TMPDIR=$(mktemp -d)
 curl -fSL "$URL" -o "$TMPDIR/$ARCHIVE"
 

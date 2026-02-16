@@ -8,7 +8,7 @@ from src.auth import ensure_auth
 from src.config import ensure_credentials, load_config, load_metatags
 from src.parser import DEFAULT_PATTERN, compile_pattern
 from src.processor import process_directory
-from src.updater import check_for_update, self_update
+from src.updater import check_for_update, cleanup_old_binary, self_update
 from src.version import __version__
 
 
@@ -38,10 +38,12 @@ def _run_upload(args):
 
 def _run_update(args):
     """Run the self-update workflow."""
-    self_update()
+    self_update(target_version=args.version)
 
 
 def main():
+    cleanup_old_binary()
+
     parser = argparse.ArgumentParser(
         description="DrChrono Batch Document Uploader.",
     )
@@ -78,7 +80,8 @@ def main():
     )
 
     # --- update subcommand ---
-    subparsers.add_parser("update", help="Update to the latest version")
+    update_parser = subparsers.add_parser("update", help="Update to the latest version")
+    update_parser.add_argument("version", nargs="?", default=None, help="Specific version to install (e.g. v0.0.2). Defaults to latest.")
 
     # If no subcommand given but args look like a path, treat as upload
     args = parser.parse_args()

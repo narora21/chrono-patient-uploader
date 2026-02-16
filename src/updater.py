@@ -51,6 +51,18 @@ def _get_binary_path() -> str:
     sys.exit(1)
 
 
+def cleanup_old_binary():
+    """Delete leftover .old binary from a previous update. Called on startup."""
+    if not getattr(sys, "frozen", False):
+        return
+    old_path = sys.executable + ".old"
+    try:
+        if os.path.exists(old_path):
+            os.remove(old_path)
+    except OSError:
+        pass
+
+
 def check_for_update():
     """Print a notice if a newer version is available. Non-blocking — silently does nothing on error."""
     try:
@@ -64,28 +76,37 @@ def check_for_update():
         pass
 
 
-def self_update():
+def self_update(target_version=None):
     """Check for a new release and replace the current binary if available."""
     print(f"Current version: {__version__}")
-    print("Checking for updates...")
+
+    if target_version:
+        # Fetch a specific version
+        tag = target_version if target_version.startswith("v") else f"v{target_version}"
+        release_url = f"https://api.github.com/repos/{REPO}/releases/tags/{tag}"
+        print(f"Fetching version {tag}...")
+    else:
+        release_url = LATEST_URL
+        print("Checking for updates...")
 
     try:
-        resp = requests.get(LATEST_URL, timeout=10)
+        resp = requests.get(release_url, timeout=10)
         resp.raise_for_status()
     except requests.RequestException as exc:
-        print(f"Error: Could not check for updates: {exc}")
+        print(f"Error: Could not fetch release: {exc}")
         sys.exit(1)
 
     release = resp.json()
-    latest_tag = release["tag_name"]
-    latest_version = _parse_version(latest_tag)
-    current_version = _parse_version(__version__)
+    release_tag = release["tag_name"]
 
-    if latest_version <= current_version:
-        print(f"Already up to date (latest: {latest_tag}).")
-        return
+    if not target_version:
+        release_version = _parse_version(release_tag)
+        current_version = _parse_version(__version__)
+        if release_version <= current_version:
+            print(f"Already up to date (latest: {release_tag}).")
+            return
 
-    print(f"New version available: {latest_tag}")
+    print(f"Installing version: {release_tag}")
 
     archive_name = _get_platform_archive()
     download_url = None
@@ -147,7 +168,11 @@ def self_update():
         # Replace the current binary
         print(f"Updating {binary_path}...")
         if system == "Windows":
-            _windows_swap(binary_path, new_binary, tmpdir)
+            # Windows locks the running exe — rename it out of the way, copy new one in
+            old_path = binary_path + ".old"
+            os.rename(binary_path, old_path)
+            shutil.copy2(new_binary, binary_path)
+            print(f"Updated successfully! The old version will be cleaned up on next run.")
         else:
             shutil.copy2(new_binary, binary_path)
             os.chmod(binary_path, os.stat(binary_path).st_mode | stat.S_IEXEC)
@@ -157,43 +182,6 @@ def self_update():
                 print(f"Updated successfully to {result.stdout.strip()}.")
             else:
                 print("Warning: Update installed but verification failed.")
-            shutil.rmtree(tmpdir, ignore_errors=True)
 
-    except Exception:
+    finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
-        raise
-
-
-def _windows_swap(binary_path: str, new_binary: str, tmpdir: str):
-    """On Windows, spawn a batch script to swap the exe after this process exits."""
-    # Copy new binary to a staging location next to the current one
-    staged_path = binary_path + ".new"
-    shutil.copy2(new_binary, staged_path)
-
-    # Write a batch script that waits for us to exit, then swaps
-    bat_path = os.path.join(os.path.dirname(binary_path), "_update.cmd")
-    with open(bat_path, "w") as f:
-        f.write("@echo off\r\n")
-        # Wait for the current process to exit (retry loop)
-        f.write("echo Waiting for chrono-uploader to exit...\r\n")
-        f.write(":wait\r\n")
-        f.write("timeout /t 1 /nobreak >nul\r\n")
-        f.write(f'del "{binary_path}" >nul 2>&1\r\n')
-        f.write("if exist \"{0}\" goto wait\r\n".format(binary_path))
-        # Move new binary into place
-        f.write(f'move "{staged_path}" "{binary_path}"\r\n')
-        # Verify
-        f.write(f'"{binary_path}" --version\r\n')
-        f.write("echo Update complete.\r\n")
-        # Clean up temp dir and this script
-        f.write(f'rmdir /s /q "{tmpdir}" >nul 2>&1\r\n')
-        f.write(f'del "%~f0"\r\n')
-
-    # Launch the batch script detached and exit
-    subprocess.Popen(
-        ["cmd", "/c", bat_path],
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
-        close_fds=True,
-    )
-    print("Update staged. The swap will complete momentarily.")
-    sys.exit(0)
