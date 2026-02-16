@@ -33,8 +33,12 @@ def load_metatags():
 
 def ensure_credentials(config):
     if not config.get("client_id") or not config.get("client_secret"):
-        print("No DrChrono credentials found. Let's set them up.")
-        print("(Register an app at https://app.drchrono.com/api-management/ first)\n")
+        print("No DrChrono credentials found. Let's set them up.\n")
+        print("  1. Go to https://drchrono.com/api-management/")
+        print("  2. Click 'New Application' and name it 'Dr Chrono Document Uploader' or whatever you want")
+        print("  3. Set the Redirect URI to: http://localhost:8585/callback")
+        print("  4. Copy the Client ID and Client Secret from the app details")
+        print("       * This will save credentials into a file `config.json` DO NOT SHARE THIS FILE\n")
         config["client_id"] = input("Client ID: ").strip()
         config["client_secret"] = input("Client Secret: ").strip()
         save_config(config)
