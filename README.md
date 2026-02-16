@@ -7,7 +7,7 @@ Batch upload documents to DrChrono from a directory. Filenames encode the patien
 ### Mac / Linux
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scripts/install.sh | sh
 ```
 
 Installs to `~/chrono-uploader/`. To add it to your PATH:
@@ -19,7 +19,7 @@ export PATH="$HOME/chrono-uploader:$PATH"
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scripts/install.ps1 | iex
 ```
 
 Installs to `%LOCALAPPDATA%\chrono-uploader\`.
@@ -139,9 +139,9 @@ Produces a `.tar.gz` (Mac/Linux) or `.zip` (Windows) containing the executable, 
 Use the release script to automate versioning:
 
 ```bash
-./release.sh            # patch bump: v0.0.1 → v0.0.2
-./release.sh --minor    # minor bump: v0.1.0 → v0.2.0
-./release.sh --major    # major bump: v1.0.0 → v2.0.0
+./scripts/release.sh            # patch bump: v0.0.1 → v0.0.2
+./scripts/release.sh --minor    # minor bump: v0.1.0 → v0.2.0
+./scripts/release.sh --major    # major bump: v1.0.0 → v2.0.0
 ```
 
 This will:
