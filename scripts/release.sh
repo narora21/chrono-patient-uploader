@@ -14,8 +14,9 @@ for arg in "$@"; do
   esac
 done
 
-# Get latest tag
-LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+# Get latest tag (across all branches, not just current)
+LATEST=$(git tag --sort=-v:refname | head -n1)
+LATEST=${LATEST:-v0.0.0}
 echo "Current version: $LATEST"
 
 # Parse version
