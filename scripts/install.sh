@@ -29,18 +29,40 @@ rm -rf "$TMPDIR"
 chmod +x "$INSTALL_DIR/chrono-uploader"
 
 echo "Verifying installation..."
-if "$INSTALL_DIR/chrono-uploader" --help > /dev/null 2>&1; then
-  echo ""
-  echo "chrono-uploader installed successfully!"
-  echo ""
-  echo "Location: $INSTALL_DIR/chrono-uploader"
-  echo ""
-  echo "To run it:"
-  echo "  $INSTALL_DIR/chrono-uploader <directory>"
-  echo ""
-  echo "Or add it to your PATH:"
-  echo "  export PATH=\"$INSTALL_DIR:\$PATH\""
-else
+if ! "$INSTALL_DIR/chrono-uploader" --help > /dev/null 2>&1; then
   echo "Error: Installation verification failed."
   exit 1
 fi
+
+# Add to PATH
+SHELL_NAME=$(basename "$SHELL")
+case "$SHELL_NAME" in
+  zsh)  RC_FILE="$HOME/.zshrc" ;;
+  bash) RC_FILE="$HOME/.bashrc" ;;
+  *)    RC_FILE="" ;;
+esac
+
+PATH_LINE="export PATH=\"$INSTALL_DIR:\$PATH\""
+
+if [ -n "$RC_FILE" ]; then
+  if ! grep -qF "$INSTALL_DIR" "$RC_FILE" 2>/dev/null; then
+    echo "" >> "$RC_FILE"
+    echo "# chrono-uploader" >> "$RC_FILE"
+    echo "$PATH_LINE" >> "$RC_FILE"
+    echo "Added chrono-uploader to PATH in $RC_FILE"
+  else
+    echo "chrono-uploader already in PATH ($RC_FILE)"
+  fi
+else
+  echo "Could not detect shell config file. Add this to your shell profile manually:"
+  echo "  $PATH_LINE"
+fi
+
+echo ""
+echo "chrono-uploader installed successfully!"
+echo ""
+echo "Restart your terminal or run:"
+echo "  $PATH_LINE"
+echo ""
+echo "Then use:"
+echo "  chrono-uploader <directory>"

@@ -24,15 +24,23 @@ Remove-Item -Recurse -Force $TmpDir
 Write-Host "Verifying installation..."
 $Exe = Join-Path $InstallDir "chrono-uploader.exe"
 & $Exe --help | Out-Null
-if ($LASTEXITCODE -eq 0) {
-    Write-Host ""
-    Write-Host "chrono-uploader installed successfully!"
-    Write-Host ""
-    Write-Host "Location: $Exe"
-    Write-Host ""
-    Write-Host "To run it:"
-    Write-Host "  & '$Exe' <directory>"
-} else {
+if ($LASTEXITCODE -ne 0) {
     Write-Error "Installation verification failed."
     exit 1
 }
+
+# Add to user PATH
+$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($UserPath -notlike "*$InstallDir*") {
+    [Environment]::SetEnvironmentVariable("Path", "$InstallDir;$UserPath", "User")
+    $env:Path = "$InstallDir;$env:Path"
+    Write-Host "Added chrono-uploader to your PATH."
+} else {
+    Write-Host "chrono-uploader already in PATH."
+}
+
+Write-Host ""
+Write-Host "chrono-uploader installed successfully!"
+Write-Host ""
+Write-Host "Restart your terminal, then run:"
+Write-Host "  chrono-uploader <directory>"

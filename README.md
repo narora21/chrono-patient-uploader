@@ -2,6 +2,8 @@
 
 Batch upload documents to DrChrono from a directory. Filenames encode the patient name, metatag, date, and document description. Works on Mac, Linux, and Windows.
 
+https://github.com/narora21/chrono-patient-uploader
+
 ## Install
 
 ### Mac / Linux
