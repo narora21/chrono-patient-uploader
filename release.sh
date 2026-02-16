@@ -33,7 +33,12 @@ esac
 
 NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+BRANCH="release/${NEW_TAG}"
 echo "New version: $NEW_TAG"
+
+# Create release branch from current HEAD
+git checkout -b "$BRANCH"
+echo "Created branch: $BRANCH"
 
 # Update version.py
 VERSION_FILE="src/version.py"
@@ -47,10 +52,10 @@ else
   echo "Warning: $VERSION_FILE not found, skipping version update in source"
 fi
 
-# Tag and push
+# Tag and push branch + tag
 git tag "$NEW_TAG"
-git push origin HEAD "$NEW_TAG"
+git push origin "$BRANCH" "$NEW_TAG"
 
 echo ""
-echo "Released $NEW_TAG"
+echo "Released $NEW_TAG on branch $BRANCH"
 echo "GitHub Actions will now build and publish the release."
