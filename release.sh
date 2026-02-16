@@ -56,6 +56,9 @@ fi
 git tag "$NEW_TAG"
 git push origin "$BRANCH" "$NEW_TAG"
 
+echo "Checking out main again"
+git checkout main
+
 echo ""
 echo "Released $NEW_TAG on branch $BRANCH"
 echo "GitHub Actions will now build and publish the release."
