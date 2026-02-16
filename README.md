@@ -77,32 +77,32 @@ chrono-uploader upload /path/to/documents/ --dest /path/to/archive/
 Files must be named as:
 
 ```
-FIRST,LAST_TAG_MMDDYY_DESCRIPTION.pdf
+LAST,FIRST_TAG_MMDDYY_DESCRIPTION.pdf
 ```
 
 With optional middle name or initial:
 
 ```
-FIRST,LAST,MIDDLE_TAG_MMDDYY_DESCRIPTION.pdf
-FIRST,LAST,M_TAG_MMDDYY_DESCRIPTION.pdf
+LAST,FIRST,MIDDLE_TAG_MMDDYY_DESCRIPTION.pdf
+LAST,FIRST,M_TAG_MMDDYY_DESCRIPTION.pdf
 ```
 
-Name parts are comma-delimited, so names with spaces are supported (e.g., `MARY ANN,DE LA CRUZ`).
+Name parts are comma-delimited, so names with spaces are supported (e.g., `DE LA CRUZ,MARY ANN`).
 
 ### Examples
 
 | Filename | Patient | Tag | Date | Description |
 |---|---|---|---|---|
-| `JANE,DOE_R_020326_CXR.pdf` | Jane Doe | R (radiology) | 2026-02-03 | CXR |
-| `JANE,DOE,M_HP_011525_CONSULT_NOTE.pdf` | Jane M Doe | HP (h&p/consults) | 2025-01-15 | CONSULT_NOTE |
-| `JOHN,SMITH_L_120124_CBC.pdf` | John Smith | L (laboratory) | 2024-12-01 | CBC |
-| `MARY ANN,DE LA CRUZ,ELIZABETH_R_020326_CXR.pdf` | Mary Ann Elizabeth De La Cruz | R (radiology) | 2026-02-03 | CXR |
+| `DOE,JANE_R_020326_CXR.pdf` | Jane Doe | R (radiology) | 2026-02-03 | CXR |
+| `DOE,JANE,M_HP_011525_CONSULT_NOTE.pdf` | Jane M Doe | HP (h&p/consults) | 2025-01-15 | CONSULT_NOTE |
+| `SMITH,JOHN_L_120124_CBC.pdf` | John Smith | L (laboratory) | 2024-12-01 | CBC |
+| `DE LA CRUZ,MARY ANN,ELIZABETH_R_020326_CXR.pdf` | Mary Ann Elizabeth De La Cruz | R (radiology) | 2026-02-03 | CXR |
 
 ### Custom patterns
 
 Use `--pattern` to change the expected filename structure. Available placeholders:
 
-- `{name}` — `FIRST,LAST[,MIDDLE]` (comma-delimited, with optional middle name/initial)
+- `{name}` — `LAST,FIRST[,MIDDLE]` (comma-delimited, with optional middle name/initial)
 - `{last_name}`, `{first_name}`, `{middle_initial}` — individual name fields
 - `{tag}` — metatag code (must match a key in `metatag.json`)
 - `{date}` — date in MMDDYY format

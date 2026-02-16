@@ -58,7 +58,7 @@ def main():
         "upload",
         help="Upload documents from a directory",
         epilog=(
-            "Pattern placeholders: {name} (FIRST,LAST[,MIDDLE]), {last_name}, {first_name}, "
+            "Pattern placeholders: {name} (LAST,FIRST[,MIDDLE]), {last_name}, {first_name}, "
             "{middle_initial}, {tag}, {date} (MMDDYY), {description}. "
             "Default: {name}_{tag}_{date}_{description}"
         ),

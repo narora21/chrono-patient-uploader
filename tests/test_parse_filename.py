@@ -54,15 +54,15 @@ class TestParseDateMmddyy:
 
 # -----------------------------------------------------------------------
 # Default pattern: {name}_{tag}_{date}_{description}
-# Name format: FIRST,LAST[,MIDDLE]
+# Name format: LAST,FIRST[,MIDDLE]
 # -----------------------------------------------------------------------
 
 class TestDefaultPattern:
     def test_basic(self, default_re):
-        result = parse_filename("JANE,DOE_R_020326_CXR.pdf", METATAGS, default_re)
+        result = parse_filename("DOE,JANE_R_020326_CXR.pdf", METATAGS, default_re)
         assert result is not None
-        assert result.first_name == "JANE"
         assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
         assert result.middle_initial is None
         assert result.tag_code == "R"
         assert result.tag_full == "radiology"
@@ -70,10 +70,10 @@ class TestDefaultPattern:
         assert result.description == "CXR"
 
     def test_middle_initial(self, default_re):
-        result = parse_filename("JANE,DOE,M_HP_011525_CONSULT_NOTE.pdf", METATAGS, default_re)
+        result = parse_filename("DOE,JANE,M_HP_011525_CONSULT_NOTE.pdf", METATAGS, default_re)
         assert result is not None
-        assert result.first_name == "JANE"
         assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
         assert result.middle_initial == "M"
         assert result.tag_code == "HP"
         assert result.tag_full == "h&p/consults"
@@ -81,43 +81,43 @@ class TestDefaultPattern:
         assert result.description == "CONSULT_NOTE"
 
     def test_middle_name(self, default_re):
-        result = parse_filename("JANE,DOE,MICHAEL_R_020326_CXR.pdf", METATAGS, default_re)
+        result = parse_filename("DOE,JANE,MICHAEL_R_020326_CXR.pdf", METATAGS, default_re)
         assert result is not None
-        assert result.first_name == "JANE"
         assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
         assert result.middle_initial == "MICHAEL"
         assert result.tag_code == "R"
         assert result.description == "CXR"
 
     def test_simple_name(self, default_re):
-        result = parse_filename("JOHN,SMITH_L_120124_CBC.pdf", METATAGS, default_re)
+        result = parse_filename("SMITH,JOHN_L_120124_CBC.pdf", METATAGS, default_re)
         assert result is not None
-        assert result.first_name == "JOHN"
         assert result.last_name == "SMITH"
+        assert result.first_name == "JOHN"
         assert result.tag_code == "L"
         assert result.tag_full == "laboratory"
         assert result.date == "2024-12-01"
         assert result.description == "CBC"
 
     def test_multi_char_tag_co(self, default_re):
-        result = parse_filename("JANE,DOE_CO_030126_REFERRAL_LETTER.pdf", METATAGS, default_re)
+        result = parse_filename("DOE,JANE_CO_030126_REFERRAL_LETTER.pdf", METATAGS, default_re)
         assert result is not None
         assert result.tag_code == "CO"
         assert result.tag_full == "correspondence"
         assert result.description == "REFERRAL_LETTER"
 
     def test_multi_char_tag_mi(self, default_re):
-        result = parse_filename("JANE,DOE_MI_030126_NOTES.pdf", METATAGS, default_re)
+        result = parse_filename("DOE,JANE_MI_030126_NOTES.pdf", METATAGS, default_re)
         assert result is not None
         assert result.tag_code == "MI"
         assert result.tag_full == "miscellaneous"
 
     def test_unknown_tag_returns_none(self, default_re):
-        result = parse_filename("JANE,DOE_X_020326_CXR.pdf", METATAGS, default_re)
+        result = parse_filename("DOE,JANE_X_020326_CXR.pdf", METATAGS, default_re)
         assert result is None
 
     def test_invalid_date_returns_none(self, default_re):
-        result = parse_filename("JANE,DOE_R_023000_CXR.pdf", METATAGS, default_re)
+        result = parse_filename("DOE,JANE_R_023000_CXR.pdf", METATAGS, default_re)
         assert result is None
 
     def test_bad_filename_returns_none(self, default_re):
@@ -125,44 +125,44 @@ class TestDefaultPattern:
         assert result is None
 
     def test_no_extension(self, default_re):
-        result = parse_filename("JANE,DOE_R_020326_CXR", METATAGS, default_re)
+        result = parse_filename("DOE,JANE_R_020326_CXR", METATAGS, default_re)
         assert result is not None
         assert result.description == "CXR"
 
     def test_description_with_multiple_underscores(self, default_re):
-        result = parse_filename("JANE,DOE_R_020326_CHEST_X_RAY_REPORT.pdf", METATAGS, default_re)
+        result = parse_filename("DOE,JANE_R_020326_CHEST_X_RAY_REPORT.pdf", METATAGS, default_re)
         assert result is not None
         assert result.description == "CHEST_X_RAY_REPORT"
 
     def test_first_name_with_space(self, default_re):
-        result = parse_filename("BOB ANNE,SMITH_D_120193_DESCRIPTION HERE.pdf", METATAGS, default_re)
+        result = parse_filename("SMITH,BOB ANNE_D_120193_DESCRIPTION HERE.pdf", METATAGS, default_re)
         assert result is not None
-        assert result.first_name == "BOB ANNE"
         assert result.last_name == "SMITH"
+        assert result.first_name == "BOB ANNE"
         assert result.middle_initial is None
         assert result.tag_code == "D"
         assert result.date == "1993-12-01"
         assert result.description == "DESCRIPTION HERE"
 
     def test_first_name_with_space_and_middle(self, default_re):
-        result = parse_filename("BOB ANNE,SMITH,M_D_120193_NOTES.pdf", METATAGS, default_re)
+        result = parse_filename("SMITH,BOB ANNE,M_D_120193_NOTES.pdf", METATAGS, default_re)
         assert result is not None
-        assert result.first_name == "BOB ANNE"
         assert result.last_name == "SMITH"
+        assert result.first_name == "BOB ANNE"
         assert result.middle_initial == "M"
 
     def test_last_name_with_space(self, default_re):
-        result = parse_filename("JANE,VAN DER BERG_R_020326_CXR.pdf", METATAGS, default_re)
+        result = parse_filename("VAN DER BERG,JANE_R_020326_CXR.pdf", METATAGS, default_re)
         assert result is not None
-        assert result.first_name == "JANE"
         assert result.last_name == "VAN DER BERG"
+        assert result.first_name == "JANE"
         assert result.middle_initial is None
 
     def test_both_names_with_spaces_and_middle(self, default_re):
-        result = parse_filename("MARY ANN,DE LA CRUZ,ELIZABETH_R_020326_CXR.pdf", METATAGS, default_re)
+        result = parse_filename("DE LA CRUZ,MARY ANN,ELIZABETH_R_020326_CXR.pdf", METATAGS, default_re)
         assert result is not None
-        assert result.first_name == "MARY ANN"
         assert result.last_name == "DE LA CRUZ"
+        assert result.first_name == "MARY ANN"
         assert result.middle_initial == "ELIZABETH"
 
 
@@ -186,10 +186,10 @@ class TestCustomPatterns:
     def test_dash_delimited(self):
         pattern = "{name}-{tag}-{date}-{description}"
         pattern_re = compile_pattern(pattern, METATAGS)
-        result = parse_filename("JANE,DOE-R-020326-CXR.pdf", METATAGS, pattern_re)
+        result = parse_filename("DOE,JANE-R-020326-CXR.pdf", METATAGS, pattern_re)
         assert result is not None
-        assert result.first_name == "JANE"
         assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
         assert result.tag_code == "R"
         assert result.date == "2026-02-03"
         assert result.description == "CXR"
@@ -197,34 +197,34 @@ class TestCustomPatterns:
     def test_tag_first(self):
         pattern = "{tag}_{name}_{date}_{description}"
         pattern_re = compile_pattern(pattern, METATAGS)
-        result = parse_filename("R_JANE,DOE_020326_CXR.pdf", METATAGS, pattern_re)
+        result = parse_filename("R_DOE,JANE_020326_CXR.pdf", METATAGS, pattern_re)
         assert result is not None
         assert result.tag_code == "R"
-        assert result.first_name == "JANE"
         assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
         assert result.date == "2026-02-03"
         assert result.description == "CXR"
 
     def test_description_first(self):
         pattern = "{description}_{tag}_{date}_{name}"
         pattern_re = compile_pattern(pattern, METATAGS)
-        result = parse_filename("CXR_R_020326_JANE,DOE.pdf", METATAGS, pattern_re)
+        result = parse_filename("CXR_R_020326_DOE,JANE.pdf", METATAGS, pattern_re)
         assert result is not None
         assert result.description == "CXR"
         assert result.tag_code == "R"
         assert result.date == "2026-02-03"
-        assert result.first_name == "JANE"
         assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
 
     def test_tag_first_with_middle_initial(self):
         pattern = "{tag}_{name}_{date}_{description}"
         pattern_re = compile_pattern(pattern, METATAGS)
-        result = parse_filename("HP_JANE,DOE,M_011525_CONSULT.pdf", METATAGS, pattern_re)
+        result = parse_filename("HP_DOE,JANE,M_011525_CONSULT.pdf", METATAGS, pattern_re)
         assert result is not None
         assert result.tag_code == "HP"
         assert result.middle_initial == "M"
-        assert result.first_name == "JANE"
         assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
 
     def test_separate_fields_with_dash(self):
         pattern = "{last_name}-{first_name}-{tag}-{date}-{description}"

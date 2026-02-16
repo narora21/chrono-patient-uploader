@@ -10,7 +10,7 @@ from src.types import ParsedFilename
 DEFAULT_PATTERN = "{name}_{tag}_{date}_{description}"
 
 _PLACEHOLDER_REGEX: dict[str, str] = {
-    "name": r"(?P<first_name>[^,]+),(?P<last_name>[^,]+?)(?:,(?P<middle_initial>[^,]+?))?",
+    "name": r"(?P<last_name>[^,]+),(?P<first_name>[^,]+?)(?:,(?P<middle_initial>[^,]+?))?",
     "last_name": r"(?P<last_name>.+?)",
     "first_name": r"(?P<first_name>.+?)",
     "middle_initial": r"(?P<middle_initial>[A-Z])",
