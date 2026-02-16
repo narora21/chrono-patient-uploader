@@ -254,3 +254,6 @@ def process_directory(config, directory, metatags, pattern_re: re.Pattern, dry_r
     print(f"Duplicates: {len(duplicate_files)}")
     print(f"Total:      {len(files)}")
     print(f"{'=' * 50}")
+
+    if dry_run:
+        print("\n[DRY RUN] No documents were uploaded or moved. Disable dry run to upload.")

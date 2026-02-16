@@ -20,7 +20,7 @@ install: $(VENV_DIR)
 	$(VENV_PIP) install -r requirements.txt
 
 build: install
-	$(VENV_PYINSTALLER) --onefile --name $(APP_NAME) $(SRC)
+	$(VENV_PYINSTALLER) --onefile --hidden-import=tkinter --name $(APP_NAME) $(SRC)
 	cp $(BUNDLE_FILES) $(DIST_DIR)
 	@echo "\nBuilt: $(DIST_DIR)/$(APP_NAME)"
 

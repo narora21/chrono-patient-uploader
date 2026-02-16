@@ -86,6 +86,9 @@ def main():
     # --- uninstall subcommand ---
     subparsers.add_parser("uninstall", help="Remove chrono-uploader from this machine")
 
+    # --- gui subcommand ---
+    subparsers.add_parser("gui", help="Launch graphical interface")
+
     # If no subcommand given but args look like a path, treat as upload
     args = parser.parse_args()
 
@@ -96,13 +99,18 @@ def main():
             upload_args = upload_parser.parse_args(sys.argv[1:])
             _run_upload(upload_args)
         else:
-            parser.print_help()
+            # No arguments — launch GUI
+            from src.gui import launch
+            launch()
     elif args.command == "upload":
         _run_upload(args)
     elif args.command == "update":
         _run_update(args)
     elif args.command == "uninstall":
         uninstall()
+    elif args.command == "gui":
+        from src.gui import launch
+        launch()
 
 
 if __name__ == "__main__":
