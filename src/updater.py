@@ -51,6 +51,44 @@ def _get_binary_path() -> str:
     sys.exit(1)
 
 
+def uninstall():
+    """Remove chrono-uploader by deleting its install directory."""
+    if not getattr(sys, "frozen", False):
+        print("Error: Uninstall only works with the standalone executable.")
+        print("You're running from source — just delete the project directory.")
+        sys.exit(1)
+
+    install_dir = os.path.dirname(sys.executable)
+
+    confirm = input(f"This will delete {install_dir} and all its contents. Continue? [y/N] ").strip().lower()
+    if confirm != "y":
+        print("Cancelled.")
+        return
+
+    system = platform.system()
+    if system == "Windows":
+        # Windows can't delete a running exe — use a cmd script to clean up after exit
+        bat_path = os.path.join(tempfile.gettempdir(), "_chrono_uninstall.cmd")
+        with open(bat_path, "w") as f:
+            f.write("@echo off\r\n")
+            f.write(":wait\r\n")
+            f.write("timeout /t 1 /nobreak >nul\r\n")
+            f.write(f'rmdir /s /q "{install_dir}" >nul 2>&1\r\n')
+            f.write(f'if exist "{install_dir}" goto wait\r\n')
+            f.write("echo chrono-uploader has been uninstalled.\r\n")
+            f.write(f'del "%~f0"\r\n')
+        subprocess.Popen(
+            ["cmd", "/c", bat_path],
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+            close_fds=True,
+        )
+        print("Uninstalling... the folder will be removed momentarily.")
+        sys.exit(0)
+    else:
+        shutil.rmtree(install_dir)
+        print("chrono-uploader has been uninstalled.")
+
+
 def cleanup_old_binary():
     """Delete leftover .old binary from a previous update. Called on startup."""
     if not getattr(sys, "frozen", False):

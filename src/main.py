@@ -8,7 +8,7 @@ from src.auth import ensure_auth
 from src.config import ensure_credentials, load_config, load_metatags
 from src.parser import DEFAULT_PATTERN, compile_pattern
 from src.processor import process_directory
-from src.updater import check_for_update, cleanup_old_binary, self_update
+from src.updater import check_for_update, cleanup_old_binary, self_update, uninstall
 from src.version import __version__
 
 
@@ -83,6 +83,9 @@ def main():
     update_parser = subparsers.add_parser("update", help="Update to the latest version")
     update_parser.add_argument("version", nargs="?", default=None, help="Specific version to install (e.g. v0.0.2). Defaults to latest.")
 
+    # --- uninstall subcommand ---
+    subparsers.add_parser("uninstall", help="Remove chrono-uploader from this machine")
+
     # If no subcommand given but args look like a path, treat as upload
     args = parser.parse_args()
 
@@ -98,6 +101,8 @@ def main():
         _run_upload(args)
     elif args.command == "update":
         _run_update(args)
+    elif args.command == "uninstall":
+        uninstall()
 
 
 if __name__ == "__main__":
