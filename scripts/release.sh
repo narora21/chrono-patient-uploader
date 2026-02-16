@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-# Usage: ./release.sh [--major | --minor | --patch]
+# Usage: ./scripts/release.sh [--major | --minor | --patch]
 # Default: patch bump
 
 BUMP="patch"
@@ -36,28 +36,27 @@ NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
 BRANCH="release/${NEW_TAG}"
 echo "New version: $NEW_TAG"
 
-# Create release branch from current HEAD
-git checkout -b "$BRANCH"
-echo "Created branch: $BRANCH"
-
-# Update version.py
+# Update version.py on main first
 VERSION_FILE="src/version.py"
 if [ -f "$VERSION_FILE" ]; then
   sed -i.bak "s/__version__ = \".*\"/__version__ = \"$NEW_VERSION\"/" "$VERSION_FILE"
   rm -f "${VERSION_FILE}.bak"
   git add "$VERSION_FILE"
   git commit -m "Bump version to $NEW_VERSION"
-  echo "Updated $VERSION_FILE"
+  echo "Updated $VERSION_FILE on main"
 else
   echo "Warning: $VERSION_FILE not found, skipping version update in source"
 fi
 
-# Tag and push branch + tag
+# Create release branch from the version bump commit
+git checkout -b "$BRANCH"
+echo "Created branch: $BRANCH"
+
+# Tag and push branch + tag, then update main
 git tag "$NEW_TAG"
 git push origin "$BRANCH" "$NEW_TAG"
-
-echo "Checking out main again"
 git checkout main
+git push origin main
 
 echo ""
 echo "Released $NEW_TAG on branch $BRANCH"
