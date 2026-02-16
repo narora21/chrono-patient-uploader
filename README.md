@@ -29,19 +29,21 @@ Installs to `%LOCALAPPDATA%\chrono-uploader\`.
 <details>
 <summary>Install a specific version</summary>
 
+Replace `<version>` with the desired version tag (e.g. `v0.0.1`, `v1.2.3`). Available versions are listed on the [releases page](https://github.com/narora21/chrono-patient-uploader/releases).
+
 **Mac / Linux:**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scripts/install.sh | sh -s -- v0.0.2
+curl -fsSL https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scripts/install.sh | sh -s -- <version>
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scripts/install.ps1 -OutFile install.ps1; .\install.ps1 -Version v0.0.2
+irm https://raw.githubusercontent.com/narora21/chrono-patient-uploader/main/scripts/install.ps1 -OutFile install.ps1; .\install.ps1 -Version <version>
 ```
 
-You can also downgrade or pin a version with the update command:
+**Already installed?** You can upgrade, downgrade, or pin to any version with:
 ```bash
-chrono-uploader update v0.0.2
+chrono-uploader update <version>
 ```
 
 </details>
