@@ -243,6 +243,10 @@ def self_update(target_version=None):
         else:
             shutil.copy2(new_binary, binary_path)
             os.chmod(binary_path, os.stat(binary_path).st_mode | stat.S_IEXEC)
+            # Re-sign to clear macOS code signing cache (prevents "killed" on first run)
+            if system == "Darwin":
+                subprocess.run(["codesign", "--force", "--sign", "-", binary_path],
+                               capture_output=True)
             print("Verifying update...")
             result = subprocess.run([binary_path, "--version"], capture_output=True, text=True)
             if result.returncode == 0:
