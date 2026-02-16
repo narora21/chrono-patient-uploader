@@ -10,7 +10,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 
 from src.auth import ensure_auth
-from src.config import ensure_credentials, load_config, load_metatags, save_config
+from src.config import ensure_credentials, load_config, load_metatags, load_settings, save_config, save_settings
 from src.parser import DEFAULT_PATTERN, compile_pattern
 from src.processor import process_directory
 from src.updater import _fetch_latest_release, _parse_version, self_update
@@ -71,6 +71,13 @@ class App:
         self._output_queue: queue.Queue = queue.Queue()
         self._running = False
         self._latest_tag: str | None = None
+
+        # Restore saved directory paths
+        settings = load_settings()
+        if settings.get("source_directory"):
+            self.source_var.set(settings["source_directory"])
+        if settings.get("dest_directory"):
+            self.dest_var.set(settings["dest_directory"])
 
         # Check for updates in background on startup
         threading.Thread(target=self._check_for_update, daemon=True).start()
@@ -223,6 +230,12 @@ class App:
         dest = self.dest_var.get().strip() or None
         dry_run = self.dry_run_var.get()
         num_workers = self.workers_var.get()
+
+        # Save directory paths for next session
+        save_settings({
+            "source_directory": source,
+            "dest_directory": dest or "",
+        })
 
         self.root.after(100, self._poll_queue)
 
