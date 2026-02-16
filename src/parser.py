@@ -10,7 +10,7 @@ from src.types import ParsedFilename
 DEFAULT_PATTERN = "{name}_{tag}_{date}_{description}"
 
 _PLACEHOLDER_REGEX: dict[str, str] = {
-    "name": r"(?P<last_name>[^,]+),(?P<first_name>[^,]+?)(?:,(?P<middle_initial>[^,]+?))?",
+    "name": r"(?P<last_name>[^,]+),\s*(?P<first_name>[^,]+?)(?:,\s*(?P<middle_initial>[^,]+?))?",
     "last_name": r"(?P<last_name>.+?)",
     "first_name": r"(?P<first_name>.+?)",
     "middle_initial": r"(?P<middle_initial>[A-Z])",
@@ -94,6 +94,8 @@ def parse_filename(filename: str, metatags: dict, pattern_re: re.Pattern) -> Opt
     last_name = groups.get("last_name", "").strip()
     first_name = groups.get("first_name", "").strip()
     middle_initial = groups.get("middle_initial")
+    if middle_initial:
+        middle_initial = middle_initial.strip() or None
     description = groups.get("description", "").strip()
 
     if not last_name or not first_name:

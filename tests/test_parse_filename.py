@@ -165,6 +165,27 @@ class TestDefaultPattern:
         assert result.first_name == "MARY ANN"
         assert result.middle_initial == "ELIZABETH"
 
+    def test_space_after_comma_with_middle(self, default_re):
+        result = parse_filename("DOE, JANE, M_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
+        assert result.middle_initial == "M"
+
+    def test_multiple_spaces_after_commas(self, default_re):
+        result = parse_filename("DOE,  JANE,  M_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
+        assert result.middle_initial == "M"
+
+    def test_space_after_comma_no_middle(self, default_re):
+        result = parse_filename("DOE, JANE_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
+        assert result.middle_initial is None
+
 
 # -----------------------------------------------------------------------
 # Custom patterns
