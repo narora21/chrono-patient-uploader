@@ -136,10 +136,32 @@ Produces a `.tar.gz` (Mac/Linux) or `.zip` (Windows) containing the executable, 
 
 ### Release a new version
 
-1. Tag the commit:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-2. GitHub Actions automatically builds executables for Mac, Linux, and Windows, then creates a GitHub Release with all three archives attached.
-3. The install scripts (`install.sh` / `install.ps1`) always pull from the latest release — no URL changes needed.
+Use the release script to automate versioning:
+
+```bash
+./release.sh            # patch bump: v0.0.1 → v0.0.2
+./release.sh --minor    # minor bump: v0.1.0 → v0.2.0
+./release.sh --major    # major bump: v1.0.0 → v2.0.0
+```
+
+This will:
+1. Create a `release/v<version>` branch from the current HEAD
+2. Update the version in `src/version.py`
+3. Tag the commit and push the branch + tag to GitHub
+4. GitHub Actions automatically builds executables for Mac, Linux, and Windows, then creates a GitHub Release with all three archives attached
+
+Each release lives on its own branch, making it easy to compare changes between versions:
+
+```bash
+git diff release/v0.0.1..release/v0.0.2
+```
+
+### Updating
+
+Users running the standalone executable can update in place:
+
+```bash
+chrono-uploader update
+```
+
+The program also checks for updates automatically on each run and notifies the user if a newer version is available.
