@@ -31,7 +31,7 @@ Remove-Item -Recurse -Force $TmpDir
 
 Write-Host "Verifying installation..."
 $Exe = Join-Path $InstallDir "chrono-uploader.exe"
-& $Exe --help | Out-Null
+& $Exe --version | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Installation verification failed."
     exit 1

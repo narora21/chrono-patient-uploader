@@ -34,7 +34,7 @@ rm -rf "$TMPDIR"
 chmod +x "$INSTALL_DIR/chrono-uploader"
 
 echo "Verifying installation..."
-if ! "$INSTALL_DIR/chrono-uploader" --help > /dev/null 2>&1; then
+if ! "$INSTALL_DIR/chrono-uploader" --version > /dev/null 2>&1; then
   echo "Error: Installation verification failed."
   exit 1
 fi
