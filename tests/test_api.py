@@ -143,6 +143,60 @@ class TestFindPatient:
         assert result.status == PatientLookupStatus.FOUND
         assert result.patient_id == 10
 
+    @patch("src.api.requests.request")
+    def test_dob_narrows_multiple_to_one(self, mock_request):
+        mock_request.return_value = _mock_response({"results": [
+            {"id": 1, "first_name": "JANE", "last_name": "DOE", "doctor": 5, "date_of_birth": "1990-01-01"},
+            {"id": 2, "first_name": "JANE", "last_name": "DOE", "doctor": 6, "date_of_birth": "1985-05-05"},
+        ]})
+        result = find_patient(FAKE_CONFIG, "DOE", "JANE", dob="1990-01-01")
+        assert result.status == PatientLookupStatus.FOUND
+        assert result.patient_id == 1
+
+    @patch("src.api.requests.request")
+    def test_dob_no_match_keeps_all(self, mock_request):
+        mock_request.return_value = _mock_response({"results": [
+            {"id": 1, "first_name": "JANE", "last_name": "DOE", "date_of_birth": "1990-01-01"},
+            {"id": 2, "first_name": "JANE", "last_name": "DOE", "date_of_birth": "1985-05-05"},
+        ]})
+        result = find_patient(FAKE_CONFIG, "DOE", "JANE", dob="2000-12-25")
+        assert result.status == PatientLookupStatus.MULTIPLE_MATCHES
+
+    @patch("src.api.requests.request")
+    def test_dob_not_provided_unchanged(self, mock_request):
+        """Without DOB, multiple matches remain multiple."""
+        mock_request.return_value = _mock_response({"results": [
+            {"id": 1, "first_name": "JANE", "last_name": "DOE", "date_of_birth": "1990-01-01"},
+            {"id": 2, "first_name": "JANE", "last_name": "DOE", "date_of_birth": "1985-05-05"},
+        ]})
+        result = find_patient(FAKE_CONFIG, "DOE", "JANE")
+        assert result.status == PatientLookupStatus.MULTIPLE_MATCHES
+
+    @patch("src.api.requests.request")
+    def test_dob_with_middle_initial_combined(self, mock_request):
+        """DOB + middle initial together narrow from 3 to 1."""
+        mock_request.return_value = _mock_response({"results": [
+            {"id": 1, "first_name": "JANE", "middle_name": "Marie", "last_name": "DOE", "doctor": 5, "date_of_birth": "1990-01-01"},
+            {"id": 2, "first_name": "JANE", "middle_name": "Marie", "last_name": "DOE", "doctor": 6, "date_of_birth": "1985-05-05"},
+            {"id": 3, "first_name": "JANE", "middle_name": "Ann", "last_name": "DOE", "doctor": 7, "date_of_birth": "1990-01-01"},
+        ]})
+        result = find_patient(FAKE_CONFIG, "DOE", "JANE", middle_initial="M", dob="1990-01-01")
+        assert result.status == PatientLookupStatus.FOUND
+        assert result.patient_id == 1
+
+    @patch("src.api.requests.request")
+    def test_cache_key_includes_dob(self, mock_request):
+        """Different DOBs should produce separate cache entries."""
+        mock_request.return_value = _mock_response({"results": [
+            {"id": 1, "first_name": "JANE", "last_name": "DOE", "doctor": 5, "date_of_birth": "1990-01-01"},
+            {"id": 2, "first_name": "JANE", "last_name": "DOE", "doctor": 6, "date_of_birth": "1985-05-05"},
+        ]})
+        result1 = find_patient(FAKE_CONFIG, "DOE", "JANE", dob="1990-01-01")
+        result2 = find_patient(FAKE_CONFIG, "DOE", "JANE", dob="1985-05-05")
+        assert result1.patient_id == 1
+        assert result2.patient_id == 2
+        assert mock_request.call_count == 2
+
 
 # -----------------------------------------------------------------------
 # is_duplicate

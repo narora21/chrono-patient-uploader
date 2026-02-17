@@ -75,6 +75,8 @@ def _process_single_file(
     print(f"  {tag}   Tag: {parsed.tag_code} ({parsed.tag_full})")
     print(f"  {tag}   Date: {parsed.date}")
     print(f"  {tag}   Description: {parsed.description}")
+    if parsed.dob:
+        print(f"  {tag}   DOB: {parsed.dob}")
 
     try:
         lookup = find_patient(
@@ -82,6 +84,7 @@ def _process_single_file(
             parsed.last_name,
             parsed.first_name,
             parsed.middle_initial,
+            dob=parsed.dob,
         )
     except RateLimitError as exc:
         print(f"  {tag}   RATE LIMITED  {exc}")

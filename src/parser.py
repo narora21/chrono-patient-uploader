@@ -7,7 +7,7 @@ from typing import Optional
 
 from src.types import ParsedFilename
 
-DEFAULT_PATTERN = "{name}_{tag}_{date}_{description}"
+DEFAULT_PATTERN = "{name}({dob})_{tag}_{date}_{description}"
 
 _PLACEHOLDER_REGEX: dict[str, str] = {
     "name": r"(?P<last_name>[^,]+),\s*(?P<first_name>[^,]+?)(?:,\s*(?P<middle_initial>[^,]+?))?",
@@ -15,6 +15,7 @@ _PLACEHOLDER_REGEX: dict[str, str] = {
     "first_name": r"(?P<first_name>.+?)",
     "middle_initial": r"(?P<middle_initial>[A-Z])",
     "date": r"(?P<date>\d{6})",
+    "dob": r"(?P<dob>\d{6})",
 }
 
 _PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
@@ -37,19 +38,46 @@ def compile_pattern(pattern: str, metatags: dict) -> re.Pattern:
     found_description = False
 
     for m in _PLACEHOLDER_RE.finditer(pattern):
-        if m.start() > pos:
-            result_parts.append(re.escape(pattern[pos:m.start()]))
-
+        literal_before = pattern[pos:m.start()]
         name = m.group(1)
-        if name == "description":
-            found_description = True
-            result_parts.append(r"(?P<description>.+)")
-        elif name in placeholders:
-            result_parts.append(placeholders[name])
-        else:
-            raise ValueError(f"Unknown placeholder: {{{name}}}")
+        after_end = m.end()
 
-        pos = m.end()
+        # Detect ({placeholder}) — parentheses make the group optional
+        wrapped_in_parens = (
+            literal_before.endswith("(")
+            and after_end < len(pattern)
+            and pattern[after_end] == ")"
+        )
+
+        if wrapped_in_parens:
+            # Append literal text before the opening paren
+            literal_without_paren = literal_before[:-1]
+            if literal_without_paren:
+                result_parts.append(re.escape(literal_without_paren))
+
+            if name == "description":
+                found_description = True
+                ph_regex = r"(?P<description>.+)"
+            elif name in placeholders:
+                ph_regex = placeholders[name]
+            else:
+                raise ValueError(f"Unknown placeholder: {{{name}}}")
+
+            result_parts.append(r"(?:\(" + ph_regex + r"\))?")
+            pos = after_end + 1  # skip past closing ")"
+        else:
+            if literal_before:
+                result_parts.append(re.escape(literal_before))
+
+            if name == "description":
+                found_description = True
+                result_parts.append(r"(?P<description>.+)")
+            elif name in placeholders:
+                result_parts.append(placeholders[name])
+            else:
+                raise ValueError(f"Unknown placeholder: {{{name}}}")
+
+            pos = m.end()
 
     if pos < len(pattern):
         result_parts.append(re.escape(pattern[pos:]))
@@ -98,6 +126,10 @@ def parse_filename(filename: str, metatags: dict, pattern_re: re.Pattern) -> Opt
         middle_initial = middle_initial.strip() or None
     description = groups.get("description", "").strip()
 
+    dob_raw = groups.get("dob")
+    dob_date = parse_date_mmddyy(dob_raw) if dob_raw else None
+    dob_iso = dob_date.isoformat() if dob_date else None
+
     if not last_name or not first_name:
         return None
 
@@ -108,6 +140,7 @@ def parse_filename(filename: str, metatags: dict, pattern_re: re.Pattern) -> Opt
         last_name=last_name,
         first_name=first_name,
         middle_initial=middle_initial,
+        dob=dob_iso,
         tag_code=tag_code,
         tag_full=tag_full,
         date=doc_date.isoformat(),

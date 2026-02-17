@@ -93,14 +93,14 @@ _patient_cache: dict[str, PatientLookupResult] = {}
 _patient_cache_lock = threading.Lock()
 
 
-def find_patient(config, last_name, first_name, middle_initial=None) -> PatientLookupResult:
+def find_patient(config, last_name, first_name, middle_initial=None, dob=None) -> PatientLookupResult:
     """Find a patient by name via the DrChrono API.
 
     If zero or multiple matches are found, returns an error.
     Results are cached so the same patient isn't looked up twice in one run.
     Thread-safe.
     """
-    cache_key = f"{last_name.lower()}|{first_name.lower()}|{(middle_initial or '').lower()}"
+    cache_key = f"{last_name.lower()}|{first_name.lower()}|{(middle_initial or '').lower()}|{dob or ''}"
     with _patient_cache_lock:
         if cache_key in _patient_cache:
             return _patient_cache[cache_key]
@@ -132,6 +132,15 @@ def find_patient(config, last_name, first_name, middle_initial=None) -> PatientL
         ]
         if len(exact) >= 1:
             results = exact
+
+    # Filter by date of birth if available
+    if dob and len(results) > 1:
+        dob_filtered = [
+            p for p in results
+            if p.get("date_of_birth") == dob
+        ]
+        if dob_filtered:
+            results = dob_filtered
 
     if len(results) == 0:
         result = PatientLookupResult(status=PatientLookupStatus.NOT_FOUND)

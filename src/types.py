@@ -38,6 +38,7 @@ class ParsedFilename(BaseModel):
     last_name: str
     first_name: str
     middle_initial: Optional[str] = None
+    dob: Optional[str] = None
     tag_code: str
     tag_full: str
     date: str

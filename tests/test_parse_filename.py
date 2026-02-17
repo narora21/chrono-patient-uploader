@@ -264,6 +264,81 @@ class TestCustomPatterns:
         result = parse_filename("badfile.pdf", METATAGS, pattern_re)
         assert result is None
 
+    def test_custom_pattern_with_optional_dob(self):
+        """Custom pattern with ({dob}) makes DOB optional."""
+        pattern = "{last_name}_{first_name}({dob})_{tag}_{date}_{description}"
+        pattern_re = compile_pattern(pattern, METATAGS)
+
+        result = parse_filename("DOE_JANE(010190)_R_020326_CXR.pdf", METATAGS, pattern_re)
+        assert result is not None
+        assert result.dob == "1990-01-01"
+
+        result = parse_filename("DOE_JANE_R_020326_CXR.pdf", METATAGS, pattern_re)
+        assert result is not None
+        assert result.dob is None
+
+
+# -----------------------------------------------------------------------
+# Default pattern with DOB: {name}({dob})_{tag}_{date}_{description}
+# -----------------------------------------------------------------------
+
+class TestDefaultPatternWithDob:
+    def test_with_dob(self, default_re):
+        result = parse_filename("DOE,JANE(010190)_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
+        assert result.dob == "1990-01-01"
+        assert result.tag_code == "R"
+        assert result.date == "2026-02-03"
+        assert result.description == "CXR"
+
+    def test_without_dob(self, default_re):
+        """DOB is optional -- existing filenames without DOB still parse."""
+        result = parse_filename("DOE,JANE_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.dob is None
+        assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
+
+    def test_with_dob_and_middle_initial(self, default_re):
+        result = parse_filename("DOE,JANE,M(010190)_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.last_name == "DOE"
+        assert result.first_name == "JANE"
+        assert result.middle_initial == "M"
+        assert result.dob == "1990-01-01"
+
+    def test_with_dob_and_middle_name(self, default_re):
+        result = parse_filename("DOE,JANE,MICHAEL(010190)_HP_011525_CONSULT.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.middle_initial == "MICHAEL"
+        assert result.dob == "1990-01-01"
+
+    def test_invalid_dob_results_in_none_dob(self, default_re):
+        """Invalid DOB (like 999999) should result in dob=None, not parse failure."""
+        result = parse_filename("DOE,JANE(999999)_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.dob is None
+
+    def test_dob_year_boundary(self, default_re):
+        """DOB 010151 should be 1951, not 2051."""
+        result = parse_filename("DOE,JANE(010151)_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.dob == "1951-01-01"
+
+    def test_dob_with_spaces_after_commas(self, default_re):
+        result = parse_filename("DOE, JANE(010190)_R_020326_CXR.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.first_name == "JANE"
+        assert result.dob == "1990-01-01"
+
+    def test_dob_with_description_underscores(self, default_re):
+        result = parse_filename("DOE,JANE(010190)_R_020326_CHEST_X_RAY.pdf", METATAGS, default_re)
+        assert result is not None
+        assert result.dob == "1990-01-01"
+        assert result.description == "CHEST_X_RAY"
+
 
 # -----------------------------------------------------------------------
 # compile_pattern validation
