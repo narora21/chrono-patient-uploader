@@ -27,6 +27,7 @@ class FileErrorReason(str, Enum):
     PATIENT_MULTIPLE_MATCHES = "patient_multiple_matches"
     DUPLICATE = "duplicate"
     UPLOAD_FAILED = "upload_failed"
+    RATE_LIMITED = "rate_limited"
 
 
 # ---------------------------------------------------------------------------

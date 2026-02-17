@@ -1,7 +1,9 @@
 """DrChrono API operations: patient lookup, duplicate detection, document upload."""
 
 import json
+import random
 import threading
+import time
 from pathlib import Path
 
 import requests
@@ -13,6 +15,75 @@ from src.types import (
     UploadResult,
     UploadStatus,
 )
+
+# ---------------------------------------------------------------------------
+# Rate-limit handling
+# ---------------------------------------------------------------------------
+
+# Retry configuration for 429 responses
+MAX_RETRIES = 3
+BACKOFF_BASE = 2  # seconds — multiplied by 2^attempt + jitter
+BACKOFF_MAX = 30  # cap on any single wait
+
+
+class RateLimitError(Exception):
+    """Raised when the API returns 429 and all retries are exhausted.
+
+    Attributes:
+        retry_after: Seconds the server asked us to wait (from Retry-After header), or None.
+        is_app_limit: True when this looks like the 500 req/hour application-level limit.
+    """
+
+    def __init__(self, message: str, retry_after: float | None = None, is_app_limit: bool = False):
+        super().__init__(message)
+        self.retry_after = retry_after
+        self.is_app_limit = is_app_limit
+
+
+def _request_with_retry(method: str, url: str, **kwargs) -> requests.Response:
+    """Execute an HTTP request with retry + exponential backoff on 429 responses.
+
+    For non-429 errors this behaves identically to ``requests.request``.
+    """
+    for attempt in range(MAX_RETRIES + 1):
+        resp = requests.request(method, url, **kwargs)
+
+        if resp.status_code != 429:
+            return resp
+
+        # Determine how long to wait
+        retry_after = resp.headers.get("Retry-After")
+        if retry_after is not None:
+            try:
+                wait = float(retry_after)
+            except ValueError:
+                wait = BACKOFF_BASE * (2 ** attempt)
+        else:
+            wait = BACKOFF_BASE * (2 ** attempt)
+
+        wait = min(wait, BACKOFF_MAX)
+        wait += random.uniform(0, 1)  # jitter
+
+        # Detect application-level limit (large Retry-After typically means hourly reset)
+        is_app_limit = retry_after is not None and float(retry_after) > 60
+
+        if attempt == MAX_RETRIES:
+            msg = (
+                "DrChrono API rate limit exceeded (HTTP 429). "
+                "All retries exhausted."
+            )
+            if is_app_limit:
+                msg = (
+                    "DrChrono application rate limit reached (500 requests/hour). "
+                    "Please wait until the top of the hour and try again."
+                )
+            raise RateLimitError(msg, retry_after=float(retry_after) if retry_after else None, is_app_limit=is_app_limit)
+
+        print(f"  [RATE LIMIT] 429 received — waiting {wait:.1f}s before retry {attempt + 1}/{MAX_RETRIES}…")
+        time.sleep(wait)
+
+    # Should not reach here, but just in case:
+    raise RateLimitError("DrChrono API rate limit exceeded (HTTP 429).")
 
 # ---------------------------------------------------------------------------
 # Patient lookup (by name, with caching)
@@ -34,7 +105,8 @@ def find_patient(config, last_name, first_name, middle_initial=None) -> PatientL
         if cache_key in _patient_cache:
             return _patient_cache[cache_key]
 
-    resp = requests.get(
+    resp = _request_with_retry(
+        "GET",
         f"{DRCHRONO_BASE}/api/patients",
         headers=api_headers(config),
         params={"last_name": last_name, "first_name": first_name},
@@ -105,7 +177,7 @@ def get_patient_documents(config, patient_id: int) -> list[dict]:
     params: dict = {"patient": patient_id}
 
     while url:
-        resp = requests.get(url, headers=api_headers(config), params=params)
+        resp = _request_with_retry("GET", url, headers=api_headers(config), params=params)
         resp.raise_for_status()
         data = resp.json()
         documents.extend(data.get("results", data.get("data", [])))
@@ -144,7 +216,8 @@ def upload_document(config, file_path, patient_id, doctor_id, date, description,
     metatags_json = json.dumps([metatag])
 
     with open(file_path, "rb") as f:
-        resp = requests.post(
+        resp = _request_with_retry(
+            "POST",
             f"{DRCHRONO_BASE}/api/documents",
             headers=api_headers(config),
             data={

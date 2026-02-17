@@ -34,16 +34,16 @@ def _clear_caches():
 # -----------------------------------------------------------------------
 
 class TestFindPatient:
-    @patch("src.api.requests.get")
-    def test_not_found(self, mock_get):
-        mock_get.return_value = _mock_response({"results": []})
+    @patch("src.api.requests.request")
+    def test_not_found(self, mock_request):
+        mock_request.return_value = _mock_response({"results": []})
         result = find_patient(FAKE_CONFIG, "DOE", "JANE")
         assert result.status == PatientLookupStatus.NOT_FOUND
         assert result.patient_id is None
 
-    @patch("src.api.requests.get")
-    def test_single_match(self, mock_get):
-        mock_get.return_value = _mock_response({"results": [
+    @patch("src.api.requests.request")
+    def test_single_match(self, mock_request):
+        mock_request.return_value = _mock_response({"results": [
             {"id": 42, "doctor": 7, "first_name": "JANE", "last_name": "DOE"},
         ]})
         result = find_patient(FAKE_CONFIG, "DOE", "JANE")
@@ -51,9 +51,9 @@ class TestFindPatient:
         assert result.patient_id == 42
         assert result.doctor_id == 7
 
-    @patch("src.api.requests.get")
-    def test_multiple_matches(self, mock_get):
-        mock_get.return_value = _mock_response({"results": [
+    @patch("src.api.requests.request")
+    def test_multiple_matches(self, mock_request):
+        mock_request.return_value = _mock_response({"results": [
             {"id": 1, "first_name": "JANE", "last_name": "DOE", "date_of_birth": "1990-01-01"},
             {"id": 2, "first_name": "JANE", "last_name": "DOE", "date_of_birth": "1985-05-05"},
         ]})
@@ -63,9 +63,9 @@ class TestFindPatient:
         assert "1990-01-01" in result.detail
         assert "1985-05-05" in result.detail
 
-    @patch("src.api.requests.get")
-    def test_middle_initial_filters(self, mock_get):
-        mock_get.return_value = _mock_response({"results": [
+    @patch("src.api.requests.request")
+    def test_middle_initial_filters(self, mock_request):
+        mock_request.return_value = _mock_response({"results": [
             {"id": 1, "first_name": "JANE", "middle_name": "Marie", "last_name": "DOE"},
             {"id": 2, "first_name": "JANE", "middle_name": "Ann", "last_name": "DOE"},
         ]})
@@ -73,19 +73,19 @@ class TestFindPatient:
         assert result.status == PatientLookupStatus.FOUND
         assert result.patient_id == 1
 
-    @patch("src.api.requests.get")
-    def test_middle_initial_no_match_keeps_all(self, mock_get):
-        mock_get.return_value = _mock_response({"results": [
+    @patch("src.api.requests.request")
+    def test_middle_initial_no_match_keeps_all(self, mock_request):
+        mock_request.return_value = _mock_response({"results": [
             {"id": 1, "first_name": "JANE", "middle_name": "Ann", "last_name": "DOE", "date_of_birth": "1990-01-01"},
             {"id": 2, "first_name": "JANE", "middle_name": "Beth", "last_name": "DOE", "date_of_birth": "1985-05-05"},
         ]})
         result = find_patient(FAKE_CONFIG, "DOE", "JANE", middle_initial="Z")
         assert result.status == PatientLookupStatus.MULTIPLE_MATCHES
 
-    @patch("src.api.requests.get")
-    def test_exact_name_narrows_multiple(self, mock_get):
+    @patch("src.api.requests.request")
+    def test_exact_name_narrows_multiple(self, mock_request):
         """SMITH search returns SMITH and SMITHSON — exact match picks SMITH."""
-        mock_get.return_value = _mock_response({"results": [
+        mock_request.return_value = _mock_response({"results": [
             {"id": 1, "first_name": "JOHN", "last_name": "SMITH", "doctor": 5},
             {"id": 2, "first_name": "JOHN", "last_name": "SMITHSON", "doctor": 6},
         ]})
@@ -93,10 +93,10 @@ class TestFindPatient:
         assert result.status == PatientLookupStatus.FOUND
         assert result.patient_id == 1
 
-    @patch("src.api.requests.get")
-    def test_exact_first_name_narrows_multiple(self, mock_get):
+    @patch("src.api.requests.request")
+    def test_exact_first_name_narrows_multiple(self, mock_request):
         """JO search returns JO and JOHN — exact match picks JO."""
-        mock_get.return_value = _mock_response({"results": [
+        mock_request.return_value = _mock_response({"results": [
             {"id": 1, "first_name": "JO", "last_name": "DOE", "doctor": 5},
             {"id": 2, "first_name": "JOHN", "last_name": "DOE", "doctor": 6},
         ]})
@@ -104,39 +104,39 @@ class TestFindPatient:
         assert result.status == PatientLookupStatus.FOUND
         assert result.patient_id == 1
 
-    @patch("src.api.requests.get")
-    def test_middle_initial_still_multiple(self, mock_get):
+    @patch("src.api.requests.request")
+    def test_middle_initial_still_multiple(self, mock_request):
         """Middle initial filters but still leaves multiple matches."""
-        mock_get.return_value = _mock_response({"results": [
+        mock_request.return_value = _mock_response({"results": [
             {"id": 1, "first_name": "JANE", "middle_name": "Marie", "last_name": "DOE", "date_of_birth": "1990-01-01"},
             {"id": 2, "first_name": "JANE", "middle_name": "May", "last_name": "DOE", "date_of_birth": "1985-05-05"},
         ]})
         result = find_patient(FAKE_CONFIG, "DOE", "JANE", middle_initial="M")
         assert result.status == PatientLookupStatus.MULTIPLE_MATCHES
 
-    @patch("src.api.requests.get")
-    def test_cache_returns_same_result(self, mock_get):
-        mock_get.return_value = _mock_response({"results": [
+    @patch("src.api.requests.request")
+    def test_cache_returns_same_result(self, mock_request):
+        mock_request.return_value = _mock_response({"results": [
             {"id": 42, "doctor": 7, "first_name": "JANE", "last_name": "DOE"},
         ]})
         result1 = find_patient(FAKE_CONFIG, "DOE", "JANE")
         result2 = find_patient(FAKE_CONFIG, "DOE", "JANE")
         assert result1 == result2
-        assert mock_get.call_count == 1  # only one API call
+        assert mock_request.call_count == 1  # only one API call
 
-    @patch("src.api.requests.get")
-    def test_cache_key_case_insensitive(self, mock_get):
-        mock_get.return_value = _mock_response({"results": [
+    @patch("src.api.requests.request")
+    def test_cache_key_case_insensitive(self, mock_request):
+        mock_request.return_value = _mock_response({"results": [
             {"id": 42, "doctor": 7, "first_name": "Jane", "last_name": "Doe"},
         ]})
         find_patient(FAKE_CONFIG, "DOE", "JANE")
         find_patient(FAKE_CONFIG, "doe", "jane")
-        assert mock_get.call_count == 1
+        assert mock_request.call_count == 1
 
-    @patch("src.api.requests.get")
-    def test_data_key_fallback(self, mock_get):
+    @patch("src.api.requests.request")
+    def test_data_key_fallback(self, mock_request):
         """API may return 'data' instead of 'results'."""
-        mock_get.return_value = _mock_response({"data": [
+        mock_request.return_value = _mock_response({"data": [
             {"id": 10, "doctor": 3, "first_name": "JOHN", "last_name": "SMITH"},
         ]})
         result = find_patient(FAKE_CONFIG, "SMITH", "JOHN")
@@ -224,21 +224,21 @@ class TestIsDuplicate:
 # -----------------------------------------------------------------------
 
 class TestUploadDocument:
-    @patch("src.api.requests.post")
-    def test_success(self, mock_post, tmp_path):
+    @patch("src.api.requests.request")
+    def test_success(self, mock_request, tmp_path):
         test_file = tmp_path / "test.pdf"
         test_file.write_text("fake pdf")
-        mock_post.return_value = _mock_response({"id": 999}, status_code=201)
+        mock_request.return_value = _mock_response({"id": 999}, status_code=201)
 
         result = upload_document(FAKE_CONFIG, str(test_file), 1, 2, "2026-02-03", "CXR", "radiology")
         assert result.status == UploadStatus.SUCCESS
         assert result.document_id == 999
 
-    @patch("src.api.requests.post")
-    def test_failure(self, mock_post, tmp_path):
+    @patch("src.api.requests.request")
+    def test_failure(self, mock_request, tmp_path):
         test_file = tmp_path / "test.pdf"
         test_file.write_text("fake pdf")
-        mock_post.return_value = _mock_response({"error": "bad request"}, status_code=400)
+        mock_request.return_value = _mock_response({"error": "bad request"}, status_code=400)
 
         result = upload_document(FAKE_CONFIG, str(test_file), 1, 2, "2026-02-03", "CXR", "radiology")
         assert result.status == UploadStatus.FAILED

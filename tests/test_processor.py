@@ -7,8 +7,9 @@ from unittest.mock import patch, MagicMock
 import pytest
 import requests
 
+from src.api import RateLimitError
 from src.parser import compile_pattern, DEFAULT_PATTERN
-from src.processor import process_directory
+from src.processor import process_directory, _INTER_FILE_SLEEP
 from src.types import (
     PatientLookupResult,
     PatientLookupStatus,
@@ -70,8 +71,8 @@ class TestCounting:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
 
         output = capsys.readouterr().out
-        assert "Skipped:    1" in output  # badfile.txt
-        assert "Uploaded:   2" in output
+        assert "Skipped:       1" in output  # badfile.txt
+        assert "Uploaded:      2" in output
 
     @patch("src.processor.upload_document")
     @patch("src.processor.is_duplicate", return_value=False)
@@ -82,8 +83,8 @@ class TestCounting:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
 
         output = capsys.readouterr().out
-        assert "Failed:     2" in output  # both valid files fail
-        assert "Skipped:    1" in output  # badfile.txt
+        assert "Failed:        2" in output  # both valid files fail
+        assert "Skipped:       1" in output  # badfile.txt
 
     @patch("src.processor.upload_document")
     @patch("src.processor.is_duplicate", return_value=True)
@@ -94,7 +95,7 @@ class TestCounting:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
 
         output = capsys.readouterr().out
-        assert "Duplicates: 2" in output
+        assert "Duplicates:    2" in output
         mock_upload.assert_not_called()
 
     @patch("src.processor.upload_document")
@@ -107,7 +108,7 @@ class TestCounting:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
 
         output = capsys.readouterr().out
-        assert "Failed:     2" in output
+        assert "Failed:        2" in output
 
 
 # -----------------------------------------------------------------------
@@ -127,7 +128,7 @@ class TestDryRun:
         mock_dup.assert_called()  # duplicate check still runs
         output = capsys.readouterr().out
         assert "DRY RUN" in output
-        assert "Uploaded:   2" in output  # counted as would-upload
+        assert "Uploaded:      2" in output  # counted as would-upload
 
     @patch("src.processor.upload_document")
     @patch("src.processor.is_duplicate", return_value=False)
@@ -153,8 +154,8 @@ class TestDryRun:
         mock_upload.assert_not_called()
         output = capsys.readouterr().out
         assert "DRY RUN" in output
-        assert "Duplicates: 2" in output
-        assert "Uploaded:   0" in output
+        assert "Duplicates:    2" in output
+        assert "Uploaded:      0" in output
 
 
 # -----------------------------------------------------------------------
@@ -210,8 +211,8 @@ class TestMultiWorker:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re, num_workers=3)
 
         output = capsys.readouterr().out
-        assert "Uploaded:   2" in output
-        assert "Skipped:    1" in output
+        assert "Uploaded:      2" in output
+        assert "Skipped:       1" in output
         assert "3 worker" in output
 
     @patch("src.processor.upload_document")
@@ -255,7 +256,7 @@ class TestAPIErrors:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
 
         output = capsys.readouterr().out
-        assert "Failed:     2" in output
+        assert "Failed:        2" in output
         assert "patient lookup failed" in output
         mock_upload.assert_not_called()
 
@@ -268,7 +269,7 @@ class TestAPIErrors:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
 
         output = capsys.readouterr().out
-        assert "Failed:     2" in output
+        assert "Failed:        2" in output
         assert "duplicate check failed" in output
         mock_upload.assert_not_called()
 
@@ -281,5 +282,124 @@ class TestAPIErrors:
         process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
 
         output = capsys.readouterr().out
-        assert "Failed:     2" in output
+        assert "Failed:        2" in output
         mock_upload.assert_not_called()
+
+
+# -----------------------------------------------------------------------
+# Rate-limit handling in processor
+# -----------------------------------------------------------------------
+
+class TestRateLimitHandling:
+    @patch("src.processor.upload_document")
+    @patch("src.processor.is_duplicate", return_value=False)
+    @patch("src.processor.find_patient")
+    def test_rate_limit_on_patient_lookup(self, mock_find, mock_dup, mock_upload, doc_dir, pattern_re, capsys):
+        """RateLimitError during patient lookup is counted as rate-limited."""
+        mock_find.side_effect = RateLimitError("rate limit exceeded", retry_after=2.0, is_app_limit=False)
+
+        process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
+
+        output = capsys.readouterr().out
+        assert "Rate-limited:  2" in output
+        assert "RATE LIMITED" in output
+        mock_upload.assert_not_called()
+
+    @patch("src.processor.upload_document")
+    @patch("src.processor.is_duplicate")
+    @patch("src.processor.find_patient")
+    def test_rate_limit_on_duplicate_check(self, mock_find, mock_dup, mock_upload, doc_dir, pattern_re, capsys):
+        """RateLimitError during duplicate check is counted as rate-limited."""
+        mock_find.return_value = _found_patient()
+        mock_dup.side_effect = RateLimitError("rate limit exceeded")
+
+        process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
+
+        output = capsys.readouterr().out
+        assert "Rate-limited:  2" in output
+        mock_upload.assert_not_called()
+
+    @patch("src.processor.upload_document")
+    @patch("src.processor.is_duplicate", return_value=False)
+    @patch("src.processor.find_patient")
+    def test_rate_limit_on_upload(self, mock_find, mock_dup, mock_upload, doc_dir, pattern_re, capsys):
+        """RateLimitError during upload is counted as rate-limited."""
+        mock_find.return_value = _found_patient()
+        mock_upload.side_effect = RateLimitError("rate limit exceeded")
+
+        process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
+
+        output = capsys.readouterr().out
+        assert "Rate-limited:  2" in output
+
+    @patch("src.processor.upload_document")
+    @patch("src.processor.is_duplicate", return_value=False)
+    @patch("src.processor.find_patient")
+    def test_app_limit_shows_clear_message(self, mock_find, mock_dup, mock_upload, doc_dir, pattern_re, capsys):
+        """Application-level rate limit shows a clear user-facing message."""
+        mock_find.side_effect = RateLimitError(
+            "DrChrono application rate limit reached (500 requests/hour)",
+            retry_after=3600.0,
+            is_app_limit=True,
+        )
+
+        process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
+
+        output = capsys.readouterr().out
+        assert "500 requests/hour" in output
+        assert "wait until the top of the hour" in output
+
+    @patch("src.processor.upload_document")
+    @patch("src.processor.is_duplicate", return_value=False)
+    @patch("src.processor.find_patient")
+    def test_rate_limited_separate_from_failed(self, mock_find, mock_dup, mock_upload, doc_dir, pattern_re, capsys):
+        """Rate-limited files appear in their own section, not under Failed."""
+        mock_find.side_effect = RateLimitError("rate limit exceeded")
+
+        process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
+
+        output = capsys.readouterr().out
+        assert "Rate-limited:  2" in output
+        assert "Failed:        0" in output
+
+
+# -----------------------------------------------------------------------
+# Inter-file sleep
+# -----------------------------------------------------------------------
+
+class TestInterFileSleep:
+    @patch("src.processor.time.sleep")
+    @patch("src.processor.upload_document")
+    @patch("src.processor.is_duplicate", return_value=False)
+    @patch("src.processor.find_patient")
+    def test_sleep_between_files(self, mock_find, mock_dup, mock_upload, mock_sleep, doc_dir, pattern_re):
+        """Workers sleep between consecutive files (not before the first)."""
+        mock_find.return_value = _found_patient()
+        mock_upload.return_value = _upload_ok()
+
+        process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re)
+
+        # 3 files total, worker processes them sequentially
+        # Sleep calls: 1 jitter + inter-file sleeps between non-first files
+        inter_file_sleeps = [
+            c for c in mock_sleep.call_args_list
+            if c[0][0] == _INTER_FILE_SLEEP
+        ]
+        # 3 files = 2 inter-file sleeps (before file 2 and 3)
+        assert len(inter_file_sleeps) == 2
+
+    @patch("src.processor.time.sleep")
+    @patch("src.processor.upload_document")
+    @patch("src.processor.is_duplicate", return_value=False)
+    @patch("src.processor.find_patient")
+    def test_no_sleep_in_dry_run(self, mock_find, mock_dup, mock_upload, mock_sleep, doc_dir, pattern_re):
+        """Dry run skips inter-file sleep since no API calls are throttled."""
+        mock_find.return_value = _found_patient()
+
+        process_directory(FAKE_CONFIG, str(doc_dir), METATAGS, pattern_re, dry_run=True)
+
+        inter_file_sleeps = [
+            c for c in mock_sleep.call_args_list
+            if c[0][0] == _INTER_FILE_SLEEP
+        ]
+        assert len(inter_file_sleeps) == 0

@@ -11,7 +11,7 @@ from typing import Optional
 
 import requests
 
-from src.api import find_patient, is_duplicate, upload_document
+from src.api import RateLimitError, find_patient, is_duplicate, upload_document
 from src.parser import parse_filename
 from src.types import (
     FileError,
@@ -22,6 +22,11 @@ from src.types import (
 
 # Max jitter in seconds between worker starts
 _WORKER_JITTER_MAX = 0.5
+
+# Sleep between consecutive API-touching files per worker (seconds).
+# DrChrono throttles at 290 requests per 10-minute window and 10 requests
+# per second.  A 2-second pause keeps us well under both limits.
+_INTER_FILE_SLEEP = 2.0
 
 
 class _FileResult:
@@ -78,6 +83,16 @@ def _process_single_file(
             parsed.first_name,
             parsed.middle_initial,
         )
+    except RateLimitError as exc:
+        print(f"  {tag}   RATE LIMITED  {exc}")
+        if exc.is_app_limit:
+            print(f"  {tag}   *** You have hit the DrChrono application rate limit (500 requests/hour). ***")
+            print(f"  {tag}   *** Please wait until the top of the hour before running again. ***")
+        return _FileResult(
+            filename=filename,
+            error=FileError(filename=filename, reason=FileErrorReason.RATE_LIMITED, detail=str(exc)),
+            category="failed",
+        )
     except requests.RequestException as exc:
         detail = f"patient lookup failed: {exc}"
         print(f"  {tag}   FAIL  {detail}")
@@ -102,6 +117,16 @@ def _process_single_file(
 
     try:
         dup = is_duplicate(config, lookup.patient_id, parsed.date, parsed.description, parsed.tag_full)
+    except RateLimitError as exc:
+        print(f"  {tag}   RATE LIMITED  {exc}")
+        if exc.is_app_limit:
+            print(f"  {tag}   *** You have hit the DrChrono application rate limit (500 requests/hour). ***")
+            print(f"  {tag}   *** Please wait until the top of the hour before running again. ***")
+        return _FileResult(
+            filename=filename,
+            error=FileError(filename=filename, reason=FileErrorReason.RATE_LIMITED, detail=str(exc)),
+            category="failed",
+        )
     except requests.RequestException as exc:
         detail = f"duplicate check failed: {exc}"
         print(f"  {tag}   FAIL  {detail}")
@@ -126,15 +151,26 @@ def _process_single_file(
         print(f"  {tag}   DRY   would upload to patient {lookup.patient_id}")
         return _FileResult(filename=filename, succeeded=True)
 
-    result = upload_document(
-        config,
-        str(file_path),
-        lookup.patient_id,
-        lookup.doctor_id,
-        parsed.date,
-        parsed.description,
-        parsed.tag_full,
-    )
+    try:
+        result = upload_document(
+            config,
+            str(file_path),
+            lookup.patient_id,
+            lookup.doctor_id,
+            parsed.date,
+            parsed.description,
+            parsed.tag_full,
+        )
+    except RateLimitError as exc:
+        print(f"  {tag}   RATE LIMITED  {exc}")
+        if exc.is_app_limit:
+            print(f"  {tag}   *** You have hit the DrChrono application rate limit (500 requests/hour). ***")
+            print(f"  {tag}   *** Please wait until the top of the hour before running again. ***")
+        return _FileResult(
+            filename=filename,
+            error=FileError(filename=filename, reason=FileErrorReason.RATE_LIMITED, detail=str(exc)),
+            category="failed",
+        )
 
     if result.status == UploadStatus.SUCCESS:
         print(f"  {tag}   OK    Document ID: {result.document_id}")
@@ -166,7 +202,9 @@ def _worker_task(
     time.sleep(jitter)
 
     results = []
-    for file_path in file_paths:
+    for i, file_path in enumerate(file_paths):
+        if i > 0 and not dry_run:
+            time.sleep(_INTER_FILE_SLEEP)
         result = _process_single_file(config, file_path, metatags, pattern_re, dry_run, dest_dir, worker_id)
         results.append(result)
     return results
@@ -204,6 +242,7 @@ def process_directory(config, directory, metatags, pattern_re: re.Pattern, dry_r
     failed_files: list[FileError] = []
     skipped_files: list[FileError] = []
     duplicate_files: list[FileError] = []
+    rate_limited_files: list[FileError] = []
 
     if num_workers == 1:
         # Single worker — run directly, no threading overhead
@@ -229,6 +268,8 @@ def process_directory(config, directory, metatags, pattern_re: re.Pattern, dry_r
                 skipped_files.append(r.error)
             elif r.category == "duplicate":
                 duplicate_files.append(r.error)
+            elif r.error.reason == FileErrorReason.RATE_LIMITED:
+                rate_limited_files.append(r.error)
             else:
                 failed_files.append(r.error)
 
@@ -245,14 +286,24 @@ def process_directory(config, directory, metatags, pattern_re: re.Pattern, dry_r
     _print_report("Failed Files", failed_files)
     _print_report("Skipped Files", skipped_files)
     _print_report("Duplicate Files", duplicate_files)
+    _print_report("Rate-Limited Files", rate_limited_files)
+
+    if rate_limited_files:
+        print(
+            "\n*** Some files were not uploaded because the DrChrono API rate "
+            "limit was reached. ***\n"
+            "*** Please wait until the top of the hour and try again for "
+            "the remaining files. ***"
+        )
 
     # --- Summary ---
     print(f"\n{'=' * 50}")
-    print(f"Uploaded:   {succeeded}")
-    print(f"Failed:     {len(failed_files)}")
-    print(f"Skipped:    {len(skipped_files)}")
-    print(f"Duplicates: {len(duplicate_files)}")
-    print(f"Total:      {len(files)}")
+    print(f"Uploaded:      {succeeded}")
+    print(f"Failed:        {len(failed_files)}")
+    print(f"Skipped:       {len(skipped_files)}")
+    print(f"Duplicates:    {len(duplicate_files)}")
+    print(f"Rate-limited:  {len(rate_limited_files)}")
+    print(f"Total:         {len(files)}")
     print(f"{'=' * 50}")
 
     if dry_run:
