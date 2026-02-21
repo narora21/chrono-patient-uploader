@@ -1,6 +1,5 @@
 """OAuth2 authorization flow for DrChrono API."""
 
-import datetime
 import sys
 import threading
 import urllib.parse
@@ -9,7 +8,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import requests
 
-from src.config import save_config
+from src.credential_store import get as cred_get, set_many as cred_set_many
 
 DRCHRONO_BASE = "https://app.drchrono.com"
 REDIRECT_PORT = 8585
@@ -55,26 +54,28 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 
 
 def _store_tokens(config, data):
-    """Save token data into config and persist to disk."""
+    """Persist refresh_token to keyring; keep access_token in session cache only."""
+    cred_set_many({
+        "refresh_token": data["refresh_token"],
+        "access_token": data["access_token"],
+    })
     config["access_token"] = data["access_token"]
     config["refresh_token"] = data["refresh_token"]
-    config["expires_at"] = (
-        datetime.datetime.now(datetime.timezone.utc)
-        + datetime.timedelta(seconds=data["expires_in"])
-    ).isoformat()
-    save_config(config)
 
 
 def authorize(config):
     """Run the full OAuth2 browser flow and return updated config with tokens."""
-    client_id = urllib.parse.quote(config["client_id"])
+    client_id_val = cred_get("client_id") or config["client_id"]
+    client_secret_val = cred_get("client_secret") or config["client_secret"]
+
+    client_id_encoded = urllib.parse.quote(client_id_val)
     redirect = urllib.parse.quote(REDIRECT_URI)
     permissions = " ".join(SCOPED_PERMISSIONS)
     scopes = urllib.parse.quote(permissions)
     url = (
         f"{DRCHRONO_BASE}/o/authorize/"
         f"?redirect_uri={redirect}&response_type=code"
-        f"&client_id={client_id}&scope={scopes}"
+        f"&client_id={client_id_encoded}&scope={scopes}"
     )
 
     _CallbackHandler.auth_code = None
@@ -95,8 +96,8 @@ def authorize(config):
         "code": code,
         "grant_type": "authorization_code",
         "redirect_uri": REDIRECT_URI,
-        "client_id": config["client_id"],
-        "client_secret": config["client_secret"],
+        "client_id": client_id_val,
+        "client_secret": client_secret_val,
     })
     resp.raise_for_status()
     _store_tokens(config, resp.json())
@@ -107,10 +108,10 @@ def authorize(config):
 def refresh_token(config):
     """Refresh an expired access token."""
     resp = requests.post(f"{DRCHRONO_BASE}/o/token/", data={
-        "refresh_token": config["refresh_token"],
+        "refresh_token": cred_get("refresh_token") or config["refresh_token"],
         "grant_type": "refresh_token",
-        "client_id": config["client_id"],
-        "client_secret": config["client_secret"],
+        "client_id": cred_get("client_id") or config["client_id"],
+        "client_secret": cred_get("client_secret") or config["client_secret"],
     })
     resp.raise_for_status()
     _store_tokens(config, resp.json())
@@ -118,21 +119,16 @@ def refresh_token(config):
 
 
 def ensure_auth(config):
-    """Ensure we have a valid access token, refreshing or re-authorizing as needed."""
-    if not config.get("access_token"):
-        return authorize(config)
-
-    expires_at = datetime.datetime.fromisoformat(config["expires_at"])
-    if datetime.datetime.now(datetime.timezone.utc) >= expires_at:
-        print("Access token expired, refreshing...")
+    """Ensure we have a valid access token by refreshing or re-authorizing."""
+    rt = cred_get("refresh_token") or config.get("refresh_token")
+    if rt:
         try:
             return refresh_token(config)
         except requests.HTTPError:
-            print("Refresh failed, re-authorizing...")
-            return authorize(config)
-
-    return config
+            print("Token refresh failed, re-authorizing...")
+    return authorize(config)
 
 
 def api_headers(config):
-    return {"Authorization": f"Bearer {config['access_token']}"}
+    token = cred_get("access_token") or config.get("access_token")
+    return {"Authorization": f"Bearer {token}"}

@@ -12,7 +12,7 @@ from tkinter import filedialog, messagebox, scrolledtext, simpledialog, ttk
 from src.auth import ensure_auth
 from src.config import (
     ensure_credentials, load_config, load_metatags, load_settings,
-    save_config, save_metatags, save_settings,
+    save_metatags, save_settings,
 )
 from src.parser import DEFAULT_PATTERN, compile_pattern
 from src.processor import process_directory
@@ -37,7 +37,12 @@ class _QueueWriter(io.TextIOBase):
 
 def _ensure_credentials_gui(config: dict, root: tk.Tk) -> dict:
     """Prompt for DrChrono credentials via GUI dialogs if missing."""
-    if config.get("client_id") and config.get("client_secret"):
+    from src.credential_store import get as cred_get, set as cred_set
+    client_id = cred_get("client_id") or config.get("client_id")
+    client_secret = cred_get("client_secret") or config.get("client_secret")
+    if client_id and client_secret:
+        config["client_id"] = client_id
+        config["client_secret"] = client_secret
         return config
 
     messagebox.showinfo(
@@ -57,9 +62,12 @@ def _ensure_credentials_gui(config: dict, root: tk.Tk) -> dict:
     if not client_secret:
         return config
 
-    config["client_id"] = client_id.strip()
-    config["client_secret"] = client_secret.strip()
-    save_config(config)
+    client_id = client_id.strip()
+    client_secret = client_secret.strip()
+    cred_set("client_id", client_id)
+    cred_set("client_secret", client_secret)
+    config["client_id"] = client_id
+    config["client_secret"] = client_secret
     return config
 
 
@@ -132,6 +140,8 @@ class App:
 
         self.upload_btn = ttk.Button(btn_row, text="Upload", command=self._start_upload)
         self.upload_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+        ttk.Button(btn_row, text="Reset Credentials", command=self._change_credentials).pack(side=tk.LEFT, padx=(0, 10))
 
         self.update_btn = ttk.Button(btn_row, text="Update", command=self._start_update)
         # Hidden until an update is detected
@@ -259,6 +269,29 @@ class App:
         if path:
             self.dest_var.set(path)
 
+    def _change_credentials(self):
+        """Prompt for new client credentials and store them."""
+        from src.credential_store import set as cred_set
+
+        client_id = simpledialog.askstring(
+            "Change Credentials", "New Client ID:", parent=self.root,
+        )
+        if not client_id:
+            return
+        client_secret = simpledialog.askstring(
+            "Change Credentials", "New Client Secret:", parent=self.root, show="*",
+        )
+        if not client_secret:
+            return
+
+        cred_set("client_id", client_id.strip())
+        cred_set("client_secret", client_secret.strip())
+        messagebox.showinfo(
+            "Credentials Updated",
+            "Client credentials have been updated. You will need to re-authorize on the next upload.",
+            parent=self.root,
+        )
+
     def _log_append(self, text: str):
         self.log.configure(state=tk.NORMAL)
         self.log.insert(tk.END, text)
@@ -365,10 +398,18 @@ class App:
         old_stdout = sys.stdout
         sys.stdout = _QueueWriter(self._output_queue)
         try:
+            from src.credential_store import (
+                clear_session, get as cred_get, load_session, migrate_from_config,
+            )
+            migrate_from_config()
+            load_session()
+
             config = load_config()
 
             # Check credentials — use GUI dialogs if missing
-            if not config.get("client_id") or not config.get("client_secret"):
+            client_id = cred_get("client_id") or config.get("client_id")
+            client_secret = cred_get("client_secret") or config.get("client_secret")
+            if not client_id or not client_secret:
                 # Schedule dialog on main thread and wait
                 result: dict = {}
                 event = threading.Event()
@@ -386,6 +427,7 @@ class App:
                     return
 
             config = ensure_auth(config)
+
             metatags = load_metatags()
             pattern_re = compile_pattern(DEFAULT_PATTERN, metatags)
 
@@ -397,6 +439,7 @@ class App:
         except Exception as exc:
             print(f"\nError: {exc}")
         finally:
+            clear_session()
             sys.stdout = old_stdout
             self._running = False
             self.root.after(0, lambda: self.upload_btn.configure(state=tk.NORMAL))

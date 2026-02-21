@@ -17,9 +17,14 @@ def _run_upload(args):
     print("=== DrChrono Batch Document Uploader ===\n")
     check_for_update()
 
+    from src.credential_store import clear_session, load_session, migrate_from_config
+    migrate_from_config()
+    load_session()
+
     config = load_config()
     config = ensure_credentials(config)
     config = ensure_auth(config)
+
     metatags = load_metatags()
 
     try:
@@ -30,10 +35,13 @@ def _run_upload(args):
 
     print(f"Using filename pattern: {args.pattern}\n")
 
-    process_directory(
-        config, args.directory, metatags, pattern_re,
-        dry_run=args.dry_run, dest_dir=args.dest, num_workers=args.num_workers,
-    )
+    try:
+        process_directory(
+            config, args.directory, metatags, pattern_re,
+            dry_run=args.dry_run, dest_dir=args.dest, num_workers=args.num_workers,
+        )
+    finally:
+        clear_session()
 
 
 def _run_update(args):

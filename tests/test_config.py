@@ -10,9 +10,12 @@ from src import config
 
 @pytest.fixture(autouse=True)
 def _isolate_paths(tmp_path, monkeypatch):
-    """Point CONFIG_FILE and METATAG_FILE at tmp_path for every test."""
+    """Point all file paths at tmp_path for every test."""
+    monkeypatch.setattr(config, "APP_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "DATA_DIR", str(tmp_path))
     monkeypatch.setattr(config, "CONFIG_FILE", str(tmp_path / "config.json"))
     monkeypatch.setattr(config, "METATAG_FILE", str(tmp_path / "metatag.json"))
+    monkeypatch.setattr(config, "SETTINGS_FILE", str(tmp_path / "settings.json"))
 
 
 # -----------------------------------------------------------------------
